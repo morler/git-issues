@@ -3,8 +3,11 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"path/filepath"
 	"strings"
 
+	"github.com/steviee/git-issues/internal/config"
+	"github.com/steviee/git-issues/internal/git"
 	"github.com/steviee/git-issues/internal/issue"
 
 	"github.com/spf13/cobra"
@@ -35,6 +38,20 @@ var checkCmd = &cobra.Command{
 		var errors []string
 		var warnings []string
 		var fixed []string
+		dirty := make(map[int]bool)
+		brokenIDs := make(map[int]bool)
+
+		// 0. Unparsable files (cannot be auto-fixed, but must not be invisible)
+		broken, err := issue.BrokenFiles(issuesDir)
+		if err != nil {
+			return err
+		}
+		for _, bf := range broken {
+			errors = append(errors, fmt.Sprintf("cannot parse %s: %v", bf.Path, bf.Err))
+			if id, ok := issue.IDFromFilename(filepath.Base(bf.Path)); ok {
+				brokenIDs[id] = true
+			}
+		}
 
 		// 1. Check for duplicate IDs
 		idCount := make(map[int][]string)
@@ -73,10 +90,15 @@ var checkCmd = &cobra.Command{
 			checkOrphans := func(relation string, ids []int) {
 				for _, refID := range ids {
 					if _, ok := issueMap[refID]; !ok {
+						if brokenIDs[refID] {
+							errors = append(errors, fmt.Sprintf("#%d: %s references broken issue #%d", iss.ID, relation, refID))
+							continue
+						}
 						errors = append(errors, fmt.Sprintf("#%d: %s references non-existent #%d", iss.ID, relation, refID))
 						if autoFix {
 							issue.RemoveFromSlice(iss, relation, refID)
 							fixed = append(fixed, fmt.Sprintf("#%d: removed orphan %s reference to #%d", iss.ID, relation, refID))
+							dirty[iss.ID] = true
 						}
 					}
 				}
@@ -101,6 +123,7 @@ var checkCmd = &cobra.Command{
 						if autoFix {
 							issue.AddToSlice(target, inv, iss.ID)
 							fixed = append(fixed, fmt.Sprintf("#%d: added missing %s #%d", refID, inv, iss.ID))
+							dirty[target.ID] = true
 						}
 					}
 				}
@@ -119,10 +142,23 @@ var checkCmd = &cobra.Command{
 			}
 		}
 
-		// Save fixed issues
-		if autoFix && len(fixed) > 0 {
+		// Save fixed issues (only the ones actually modified)
+		if autoFix && len(dirty) > 0 {
+			cfg, err := config.Load(issuesDir)
+			if err != nil {
+				return err
+			}
 			for _, iss := range issues {
-				issue.Save(issuesDir, iss)
+				if !dirty[iss.ID] {
+					continue
+				}
+				if err := issue.Save(issuesDir, iss); err != nil {
+					errors = append(errors, fmt.Sprintf("#%d: failed to save fix: %v", iss.ID, err))
+					continue
+				}
+				if cfg.AutoStage {
+					_ = git.Stage(iss.FilePath)
+				}
 			}
 		}
 
@@ -133,23 +169,23 @@ var checkCmd = &cobra.Command{
 		}
 
 		if len(errors) > 0 {
-			fmt.Fprintf(os.Stderr, "Errors (%d):\n", len(errors))
+			_, _ = fmt.Fprintf(os.Stderr, "Errors (%d):\n", len(errors))
 			for _, e := range errors {
-				fmt.Fprintf(os.Stderr, "  ✗ %s\n", e)
+				_, _ = fmt.Fprintf(os.Stderr, "  ✗ %s\n", e)
 			}
 		}
 
 		if len(warnings) > 0 {
-			fmt.Fprintf(os.Stderr, "Warnings (%d):\n", len(warnings))
+			_, _ = fmt.Fprintf(os.Stderr, "Warnings (%d):\n", len(warnings))
 			for _, w := range warnings {
-				fmt.Fprintf(os.Stderr, "  ⚠ %s\n", w)
+				_, _ = fmt.Fprintf(os.Stderr, "  ⚠ %s\n", w)
 			}
 		}
 
 		if len(fixed) > 0 {
-			fmt.Fprintf(os.Stdout, "Fixed (%d):\n", len(fixed))
+			_, _ = fmt.Fprintf(os.Stdout, "Fixed (%d):\n", len(fixed))
 			for _, f := range fixed {
-				fmt.Fprintf(os.Stdout, "  ✓ %s\n", f)
+				_, _ = fmt.Fprintf(os.Stdout, "  ✓ %s\n", f)
 			}
 		}
 

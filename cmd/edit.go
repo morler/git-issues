@@ -38,7 +38,7 @@ var editCmd = &cobra.Command{
 
 		iss, err := issue.LoadByID(issuesDir, id)
 		if err != nil {
-			return fmt.Errorf("Error: issue #%d not found", id)
+			return fmt.Errorf("issue #%d not found", id)
 		}
 
 		// Snapshot old relations for diff (will be used in Phase 5)
@@ -60,11 +60,11 @@ var editCmd = &cobra.Command{
 		// Re-parse the file
 		edited, err := issue.ParseFile(iss.FilePath)
 		if err != nil {
-			return fmt.Errorf("Error parsing edited file: %w", err)
+			return fmt.Errorf("error parsing edited file: %w", err)
 		}
 
 		if err := issue.Validate(edited); err != nil {
-			return fmt.Errorf("Error: %w", err)
+			return fmt.Errorf("%w", err)
 		}
 
 		// Save (updates `updated` field)
@@ -73,7 +73,7 @@ var editCmd = &cobra.Command{
 		}
 
 		if cfg.AutoStage {
-			git.Stage(edited.FilePath)
+			_ = git.Stage(edited.FilePath)
 		}
 
 		// Sync relation changes bidirectionally
@@ -85,9 +85,11 @@ var editCmd = &cobra.Command{
 				continue
 			}
 			issue.AddToSlice(target, issue.Inverse(entry.Relation), id)
-			issue.Save(issuesDir, target)
+			if err := issue.Save(issuesDir, target); err != nil {
+				return fmt.Errorf("failed to sync relation with #%d: %w", entry.ID, err)
+			}
 			if cfg.AutoStage {
-				git.Stage(target.FilePath)
+				_ = git.Stage(target.FilePath)
 			}
 		}
 		for _, entry := range removed {
@@ -96,9 +98,11 @@ var editCmd = &cobra.Command{
 				continue
 			}
 			issue.RemoveFromSlice(target, issue.Inverse(entry.Relation), id)
-			issue.Save(issuesDir, target)
+			if err := issue.Save(issuesDir, target); err != nil {
+				return fmt.Errorf("failed to sync relation with #%d: %w", entry.ID, err)
+			}
 			if cfg.AutoStage {
-				git.Stage(target.FilePath)
+				_ = git.Stage(target.FilePath)
 			}
 		}
 

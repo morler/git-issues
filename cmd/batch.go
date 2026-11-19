@@ -73,7 +73,7 @@ var batchCloseCmd = &cobra.Command{
 				continue
 			}
 			if cfg.AutoStage {
-				git.Stage(iss.FilePath)
+				_ = git.Stage(iss.FilePath)
 			}
 			count++
 			fmt.Printf("Closed: #%d %s\n", iss.ID, iss.Title)
@@ -122,12 +122,12 @@ var batchSetCmd = &cobra.Command{
 			switch field {
 			case "priority":
 				if !contains(issue.ValidPriorities, value) {
-					return fmt.Errorf("Error: invalid priority %q, must be one of: %s", value, strings.Join(issue.ValidPriorities, ", "))
+					return fmt.Errorf("invalid priority %q, must be one of: %s", value, strings.Join(issue.ValidPriorities, ", "))
 				}
 				iss.Priority = value
 			case "status":
 				if !contains(issue.ValidStatuses, value) {
-					return fmt.Errorf("Error: invalid status %q, must be one of: %s", value, strings.Join(issue.ValidStatuses, ", "))
+					return fmt.Errorf("invalid status %q, must be one of: %s", value, strings.Join(issue.ValidStatuses, ", "))
 				}
 				iss.Status = value
 				if value == "closed" || value == "wontfix" {
@@ -151,7 +151,7 @@ var batchSetCmd = &cobra.Command{
 					}
 				}
 			default:
-				return fmt.Errorf("Error: unknown field %q for batch set, must be one of: priority, status, label", field)
+				return fmt.Errorf("unknown field %q for batch set, must be one of: priority, status, label", field)
 			}
 
 			if err := issue.Save(issuesDir, iss); err != nil {
@@ -159,7 +159,7 @@ var batchSetCmd = &cobra.Command{
 				continue
 			}
 			if cfg.AutoStage {
-				git.Stage(iss.FilePath)
+				_ = git.Stage(iss.FilePath)
 			}
 			count++
 			fmt.Printf("Updated #%d: %s = %s\n", iss.ID, field, value)

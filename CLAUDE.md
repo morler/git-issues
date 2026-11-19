@@ -8,7 +8,7 @@ Build a CLI tool called `git-issues` (binary: `issues`) that provides a git-nati
 
 ## Tech Stack
 
-- **Language:** Go 1.22+
+- **Language:** Go 1.25+
 - **Dependencies (minimal):**
   - `gopkg.in/yaml.v3` – Frontmatter parsing
   - `github.com/spf13/cobra` – CLI framework
@@ -23,6 +23,7 @@ Build a CLI tool called `git-issues` (binary: `issues`) that provides a git-nati
 ```
 git-issues/
   cmd/
+    issues/main.go   ← entrypoint producing the `issues` binary
     root.go
     new.go
     list.go
@@ -122,10 +123,12 @@ Weitere Notizen als freie Sections.
 Slug generation:
 1. Lowercase the title
 2. Replace umlauts: ä→ae, ö→oe, ü→ue, ß→ss
-3. Remove all characters except `[a-z0-9 -]`
-4. Replace spaces with `-`
-5. Truncate to 40 characters
-6. Strip trailing `-`
+3. Keep Unicode letters and digits; turn whitespace and dashes into `-`; drop everything else
+4. Collapse repeated dashes
+5. Truncate to 40 characters (runes, not bytes)
+6. Strip leading and trailing `-`
+
+If the resulting slug is empty, use `issue`.
 
 Examples:
 - `"Login schlägt bei leeren Passwörtern fehl"` → `0007-login-schlaegt-bei-leeren-passwoertern`
@@ -643,6 +646,7 @@ test:
 
 lint:
     go vet ./...
+    golangci-lint run ./...
 ```
 
 ---
@@ -682,6 +686,5 @@ Do not implement:
 - GitHub sync
 - Color output (keep it simple, add later)
 - Fuzzy search
-- Interactive TUI
 ```
 

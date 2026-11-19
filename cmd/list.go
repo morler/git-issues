@@ -52,25 +52,7 @@ var listCmd = &cobra.Command{
 		}
 
 		// Filter
-		var filtered []*issue.Issue
-		for _, iss := range issues {
-			if status != "all" && iss.Status != status {
-				continue
-			}
-			if priority != "" && iss.Priority != priority {
-				continue
-			}
-			if len(labels) > 0 && !hasAnyLabel(iss.Labels, labels) {
-				continue
-			}
-			if blocksID != 0 && !containsInt(iss.Relations.Blocks, blocksID) {
-				continue
-			}
-			if dependsOnID != 0 && !containsInt(iss.Relations.DependsOn, dependsOnID) {
-				continue
-			}
-			filtered = append(filtered, iss)
-		}
+		filtered := filterIssues(issues, status, priority, labels, blocksID, dependsOnID)
 
 		// Sort
 		sortIssues(filtered, sortBy)
@@ -95,6 +77,29 @@ var listCmd = &cobra.Command{
 
 		return nil
 	},
+}
+
+func filterIssues(issues []*issue.Issue, status, priority string, labels []string, blocksID, dependsOnID int) []*issue.Issue {
+	var filtered []*issue.Issue
+	for _, iss := range issues {
+		if status != "all" && iss.Status != status {
+			continue
+		}
+		if priority != "" && iss.Priority != priority {
+			continue
+		}
+		if len(labels) > 0 && !hasAnyLabel(iss.Labels, labels) {
+			continue
+		}
+		if blocksID != 0 && !containsInt(iss.Relations.Blocks, blocksID) {
+			continue
+		}
+		if dependsOnID != 0 && !containsInt(iss.Relations.DependsOn, dependsOnID) {
+			continue
+		}
+		filtered = append(filtered, iss)
+	}
+	return filtered
 }
 
 func hasAnyLabel(issueLabels, filterLabels []string) bool {
@@ -145,14 +150,11 @@ func printTable(issues []*issue.Issue, issueMap map[int]*issue.Issue) {
 
 	hasSymbols := false
 
-	fmt.Fprintf(os.Stdout, "%-6s%-10s%-13s%-46s%-14s%s\n",
-		"ID", "PRI", "STATUS", "TITLE", "LABELS", "")
+	_, _ = fmt.Fprintf(os.Stdout, "%s%s%s%s%s%s\n",
+		padRight("ID", 6), padRight("PRI", 10), padRight("STATUS", 13), padRight("TITLE", 46), padRight("LABELS", 14), "")
 
 	for _, iss := range issues {
-		title := iss.Title
-		if len(title) > 44 {
-			title = title[:41] + "..."
-		}
+		title := truncateDisplay(iss.Title, 44)
 
 		labelsStr := ""
 		if len(iss.Labels) > 0 {
@@ -201,8 +203,13 @@ func printTable(issues []*issue.Issue, issueMap map[int]*issue.Issue) {
 			hasSymbols = true
 		}
 
-		fmt.Fprintf(os.Stdout, "%04d  %-10s%-13s%-46s%-14s%s\n",
-			iss.ID, iss.Priority, iss.Status, title, labelsStr, relStr)
+		_, _ = fmt.Fprintf(os.Stdout, "%s%s%s%s%s%s\n",
+			padRight(fmt.Sprintf("%04d", iss.ID), 6),
+			padRight(iss.Priority, 10),
+			padRight(iss.Status, 13),
+			padRight(title, 46),
+			padRight(labelsStr, 14),
+			relStr)
 	}
 
 	if hasSymbols {

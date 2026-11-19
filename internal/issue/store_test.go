@@ -11,18 +11,31 @@ func TestIssuesDir(t *testing.T) {
 	// Create a temp dir with .issues/ subdirectory
 	root := t.TempDir()
 	issuesDir := filepath.Join(root, ".issues")
-	os.MkdirAll(issuesDir, 0755)
+	if err := os.MkdirAll(issuesDir, 0755); err != nil {
+		t.Fatalf("mkdir .issues: %v", err)
+	}
 
 	// Create a nested subdirectory to test walking up
 	nested := filepath.Join(root, "src", "pkg")
-	os.MkdirAll(nested, 0755)
+	if err := os.MkdirAll(nested, 0755); err != nil {
+		t.Fatalf("mkdir nested: %v", err)
+	}
 
 	// Save original dir
-	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(origDir); err != nil {
+			t.Errorf("chdir back: %v", err)
+		}
+	}()
 
 	// Change to nested dir and try to find .issues/
-	os.Chdir(nested)
+	if err := os.Chdir(nested); err != nil {
+		t.Fatalf("chdir nested: %v", err)
+	}
 	found, err := IssuesDir()
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -37,11 +50,20 @@ func TestIssuesDir(t *testing.T) {
 
 func TestIssuesDirNotFound(t *testing.T) {
 	dir := t.TempDir()
-	origDir, _ := os.Getwd()
-	defer os.Chdir(origDir)
+	origDir, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	defer func() {
+		if err := os.Chdir(origDir); err != nil {
+			t.Errorf("chdir back: %v", err)
+		}
+	}()
 
-	os.Chdir(dir)
-	_, err := IssuesDir()
+	if err := os.Chdir(dir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	_, err = IssuesDir()
 	if err == nil {
 		t.Error("expected error when .issues/ not found")
 	}
@@ -65,7 +87,9 @@ func TestLoadAllSkipsDotFiles(t *testing.T) {
 	dir := t.TempDir()
 	writeIssueFile(t, dir, 1, "Normal issue")
 	// Write a dotfile that looks like an issue
-	os.WriteFile(filepath.Join(dir, ".agent.md"), []byte("---\nid: 99\ntitle: Agent\nstatus: open\npriority: medium\nlabels: []\ncreated: 2026-01-01\nupdated: 2026-01-01\n---\n"), 0644)
+	if err := os.WriteFile(filepath.Join(dir, ".agent.md"), []byte("---\nid: 99\ntitle: Agent\nstatus: open\npriority: medium\nlabels: []\ncreated: 2026-01-01\nupdated: 2026-01-01\n---\n"), 0644); err != nil {
+		t.Fatalf("write dotfile: %v", err)
+	}
 
 	issues, err := LoadAll(dir)
 	if err != nil {
@@ -162,4 +186,3 @@ func writeIssueFile(t *testing.T, dir string, id int, title string) {
 		t.Fatal(err)
 	}
 }
-

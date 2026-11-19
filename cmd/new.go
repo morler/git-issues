@@ -77,6 +77,11 @@ var newCmd = &cobra.Command{
 			return nil
 		}
 
+		allTargets := append(append(append([]int{}, blocks...), dependsOn...), relatedTo...)
+		if err := ensureIssuesExist(issuesDir, allTargets); err != nil {
+			return err
+		}
+
 		nextID, err := issue.NextID(issuesDir)
 		if err != nil {
 			return err
@@ -98,22 +103,22 @@ var newCmd = &cobra.Command{
 		}
 
 		if err := issue.Save(issuesDir, iss); err != nil {
-			return fmt.Errorf("Error: %w", err)
+			return fmt.Errorf("%w", err)
 		}
 
 		if cfg.AutoStage {
-			git.Stage(iss.FilePath)
+			_ = git.Stage(iss.FilePath)
 		}
 
 		// Sync relations bidirectionally
-		for _, targetID := range blocks {
-			issue.AddRelation(issuesDir, nextID, "blocks", targetID, cfg)
+		if err := applyRelations(issuesDir, nextID, "blocks", blocks, cfg); err != nil {
+			return err
 		}
-		for _, targetID := range dependsOn {
-			issue.AddRelation(issuesDir, nextID, "depends-on", targetID, cfg)
+		if err := applyRelations(issuesDir, nextID, "depends-on", dependsOn, cfg); err != nil {
+			return err
 		}
-		for _, targetID := range relatedTo {
-			issue.AddRelation(issuesDir, nextID, "related-to", targetID, cfg)
+		if err := applyRelations(issuesDir, nextID, "related-to", relatedTo, cfg); err != nil {
+			return err
 		}
 
 		filename := filepath.Base(iss.FilePath)
@@ -133,13 +138,13 @@ func openEditor(cfg *config.Config) (title, priority string, labels []string, bo
 		return "", "", nil, "", nil, nil, nil, err
 	}
 	tmpPath := tmpFile.Name()
-	defer os.Remove(tmpPath)
+	defer func() { _ = os.Remove(tmpPath) }()
 
 	if _, err := tmpFile.WriteString(editorTemplate); err != nil {
-		tmpFile.Close()
+		_ = tmpFile.Close()
 		return "", "", nil, "", nil, nil, nil, err
 	}
-	tmpFile.Close()
+	_ = tmpFile.Close()
 
 	editorCmd := exec.Command(editor, tmpPath)
 	editorCmd.Stdin = os.Stdin
@@ -164,6 +169,24 @@ func openEditor(cfg *config.Config) (title, priority string, labels []string, bo
 	}
 
 	return iss.Title, priority, iss.Labels, iss.Body, iss.Relations.Blocks, iss.Relations.DependsOn, iss.Relations.RelatedTo, nil
+}
+
+func ensureIssuesExist(issuesDir string, ids []int) error {
+	for _, id := range ids {
+		if _, err := issue.LoadByID(issuesDir, id); err != nil {
+			return fmt.Errorf("issue #%d not found", id)
+		}
+	}
+	return nil
+}
+
+func applyRelations(issuesDir string, sourceID int, relation string, ids []int, cfg *config.Config) error {
+	for _, targetID := range ids {
+		if err := issue.AddRelation(issuesDir, sourceID, relation, targetID, cfg); err != nil {
+			return fmt.Errorf("issue #%d created, but could not add %s relation to #%d: %w", sourceID, relation, targetID, err)
+		}
+	}
+	return nil
 }
 
 func parseID(s string) (int, error) {

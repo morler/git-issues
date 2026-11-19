@@ -32,7 +32,7 @@ var relateCmd = &cobra.Command{
 		}
 
 		if !contains(validRelations, relation) {
-			return fmt.Errorf("Error: invalid relation %q, must be one of: %s", relation, strings.Join(validRelations, ", "))
+			return fmt.Errorf("invalid relation %q, must be one of: %s", relation, strings.Join(validRelations, ", "))
 		}
 
 		issuesDir, err := issue.IssuesDir()

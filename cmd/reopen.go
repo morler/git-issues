@@ -36,7 +36,7 @@ var reopenCmd = &cobra.Command{
 
 		iss, err := issue.LoadByID(issuesDir, id)
 		if err != nil {
-			return fmt.Errorf("Error: issue #%d not found", id)
+			return fmt.Errorf("issue #%d not found", id)
 		}
 
 		iss.Status = "open"
@@ -47,7 +47,7 @@ var reopenCmd = &cobra.Command{
 		}
 
 		if cfg.AutoStage {
-			git.Stage(iss.FilePath)
+			_ = git.Stage(iss.FilePath)
 		}
 
 		fmt.Printf("Reopened: #%d\n", id)

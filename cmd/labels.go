@@ -63,13 +63,13 @@ var labelsCmd = &cobra.Command{
 
 		maxLen := 0
 		for _, lc := range sorted {
-			if len(lc.label) > maxLen {
-				maxLen = len(lc.label)
+			if w := displayWidth(lc.label); w > maxLen {
+				maxLen = w
 			}
 		}
 
 		for _, lc := range sorted {
-			fmt.Printf("%-*s  %d\n", maxLen, lc.label, lc.count)
+			fmt.Printf("%s  %d\n", padRight(lc.label, maxLen), lc.count)
 		}
 
 		return nil

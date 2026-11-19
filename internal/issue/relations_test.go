@@ -1,6 +1,7 @@
 package issue
 
 import (
+	"bytes"
 	"os"
 	"path/filepath"
 	"testing"
@@ -555,5 +556,49 @@ func TestAddRelationMissingTarget(t *testing.T) {
 	err := AddRelation(tmpDir, 1, "blocks", 999, cfg)
 	if err == nil {
 		t.Fatal("expected error when target ID not found, got nil")
+	}
+}
+
+func TestSavePairRollsBackFirstOnFailure(t *testing.T) {
+	dir := t.TempDir()
+
+	first := &Issue{
+		ID:       1,
+		Title:    "First",
+		Status:   "open",
+		Priority: "medium",
+		Labels:   []string{},
+		Created:  "2026-03-04",
+		Updated:  "2026-03-04",
+	}
+	if err := Save(dir, first); err != nil {
+		t.Fatalf("failed to write first issue: %v", err)
+	}
+	before, err := os.ReadFile(first.FilePath)
+	if err != nil {
+		t.Fatalf("failed to read first issue: %v", err)
+	}
+
+	second := &Issue{
+		ID:       2,
+		Title:    "Second",
+		Status:   "open",
+		Priority: "medium",
+		Labels:   []string{},
+		Created:  "2026-03-04",
+		Updated:  "2026-03-04",
+		FilePath: filepath.Join(dir, "missing", "0002-second.md"),
+	}
+
+	if err := savePair(dir, first, second); err == nil {
+		t.Fatal("expected savePair to fail when the second file is unwritable")
+	}
+
+	after, err := os.ReadFile(first.FilePath)
+	if err != nil {
+		t.Fatalf("failed to read first issue after rollback: %v", err)
+	}
+	if !bytes.Equal(before, after) {
+		t.Errorf("first issue was not restored after failed pair save\nbefore:\n%s\nafter:\n%s", before, after)
 	}
 }

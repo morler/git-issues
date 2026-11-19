@@ -1,6 +1,9 @@
 package issue
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestGenerateSlug(t *testing.T) {
 	tests := []struct {
@@ -27,6 +30,26 @@ func TestGenerateSlug(t *testing.T) {
 			name:  "truncation at 40 chars with trailing dash stripped",
 			title: "This is an extremely long title that should be truncated at exactly forty chars",
 			want:  "this-is-an-extremely-long-title-that-sho",
+		},
+		{
+			name:  "chinese title keeps letters",
+			title: "修复登录 bug",
+			want:  "修复登录-bug",
+		},
+		{
+			name:  "full-width space becomes dash",
+			title: "修复　登录",
+			want:  "修复-登录",
+		},
+		{
+			name:  "emoji removed",
+			title: "Fix 🐛 bug",
+			want:  "fix-bug",
+		},
+		{
+			name:  "chinese title truncated by runes",
+			title: strings.Repeat("中", 41),
+			want:  strings.Repeat("中", 40),
 		},
 		{
 			name:  "empty string",
@@ -83,6 +106,12 @@ func TestFilename(t *testing.T) {
 			id:   1,
 			slug: "fix-auth-bug",
 			want: "0001-fix-auth-bug.md",
+		},
+		{
+			name: "empty slug falls back to issue",
+			id:   1,
+			slug: "",
+			want: "0001-issue.md",
 		},
 		{
 			name: "large id",

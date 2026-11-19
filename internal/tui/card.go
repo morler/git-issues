@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/mattn/go-runewidth"
 	"github.com/steviee/git-issues/internal/issue"
 )
 
@@ -26,11 +27,11 @@ func RenderCard(iss *issue.Issue, width int, selected bool) string {
 	// ID line
 	idLine := fmt.Sprintf("#%-4d %s", iss.ID, priStr)
 
-	// Title (truncate to fit)
+	// Title (truncate to fit, by display width so multi-byte text is not cut)
 	maxTitleLen := width - 4
 	title := iss.Title
-	if len(title) > maxTitleLen {
-		title = title[:maxTitleLen-1] + "…"
+	if maxTitleLen > 0 {
+		title = runewidth.Truncate(title, maxTitleLen, "…")
 	}
 
 	// Labels

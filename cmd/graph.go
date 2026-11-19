@@ -2,6 +2,8 @@ package cmd
 
 import (
 	"fmt"
+	"io"
+	"os"
 
 	"github.com/steviee/git-issues/internal/issue"
 
@@ -44,7 +46,7 @@ var graphCmd = &cobra.Command{
 			// Show subgraph from root
 			visited := make(map[int]bool)
 			printed := make(map[int]bool)
-			printNode(issueMap, rootID, "", visited, printed)
+			printNode(os.Stdout, issueMap, rootID, "", visited, printed)
 			return nil
 		}
 
@@ -68,7 +70,7 @@ var graphCmd = &cobra.Command{
 				continue
 			}
 			visited := make(map[int]bool)
-			printNode(issueMap, iss.ID, "", visited, globalPrinted)
+			printNode(os.Stdout, issueMap, iss.ID, "", visited, globalPrinted)
 			fmt.Println()
 		}
 
@@ -81,7 +83,7 @@ var graphCmd = &cobra.Command{
 				continue
 			}
 			visited := make(map[int]bool)
-			printNode(issueMap, iss.ID, "", visited, globalPrinted)
+			printNode(os.Stdout, issueMap, iss.ID, "", visited, globalPrinted)
 			fmt.Println()
 		}
 
@@ -89,20 +91,20 @@ var graphCmd = &cobra.Command{
 	},
 }
 
-func printNode(issueMap map[int]*issue.Issue, id int, indent string, visited map[int]bool, globalPrinted map[int]bool) {
+func printNode(w io.Writer, issueMap map[int]*issue.Issue, id int, indent string, visited map[int]bool, globalPrinted map[int]bool) {
 	iss, ok := issueMap[id]
 	if !ok {
 		return
 	}
 
 	if visited[id] {
-		fmt.Printf("%sWarning: cycle detected at #%d, truncating\n", indent, id)
+		_, _ = fmt.Fprintf(w, "%sWarning: cycle detected at #%d, truncating\n", indent, id)
 		return
 	}
 	visited[id] = true
 	globalPrinted[id] = true
 
-	fmt.Printf("%s#%d  %s [%s, %s]\n", indent, iss.ID, iss.Title, iss.Status, iss.Priority)
+	_, _ = fmt.Fprintf(w, "%s#%d  %s [%s, %s]\n", indent, iss.ID, iss.Title, iss.Status, iss.Priority)
 
 	// Show blocks relations
 	var blocksInSet []int
@@ -113,11 +115,11 @@ func printNode(issueMap map[int]*issue.Issue, id int, indent string, visited map
 	}
 
 	if len(blocksInSet) > 0 {
-		fmt.Printf("%s└── blocks:\n", indent)
+		_, _ = fmt.Fprintf(w, "%s└── blocks:\n", indent)
 		for _, bid := range blocksInSet {
-			printNode(issueMap, bid, indent+"    ", visited, globalPrinted)
+			printNode(w, issueMap, bid, indent+"    ", visited, globalPrinted)
 		}
 	} else if indent == "" {
-		fmt.Printf("%s    (no relations)\n", indent)
+		_, _ = fmt.Fprintf(w, "%s    (no relations)\n", indent)
 	}
 }

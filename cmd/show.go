@@ -32,7 +32,7 @@ var showCmd = &cobra.Command{
 
 		iss, err := issue.LoadByID(issuesDir, id)
 		if err != nil {
-			return fmt.Errorf("Error: issue #%d not found", id)
+			return fmt.Errorf("issue #%d not found", id)
 		}
 
 		format, _ := cmd.Flags().GetString("format")
@@ -106,6 +106,6 @@ func printRelationSection(issuesDir string, label string, ids []int, showBlocker
 		if showBlocker && (related.Status == "open" || related.Status == "in-progress") {
 			blocker = "  ← BLOCKER"
 		}
-		fmt.Printf("%s#%-3d %-40s [%s]%s\n", prefix, id, related.Title, related.Status, blocker)
+		fmt.Printf("%s#%-3d %s [%s]%s\n", prefix, id, padRight(truncateDisplay(related.Title, 40), 40), related.Status, blocker)
 	}
 }

@@ -45,10 +45,12 @@ issues show <id> --format json                # JSON output
 issues new --title "..." --priority high      # create issue inline
 issues set <id> priority critical             # change priority
 issues set <id> label +bug                    # add label
-issues close <id>                             # close with blocker warning
-issues close <id> --wontfix                   # mark as won't fix
+issues close <id>                            # close with blocker warning
+issues close <id> --force                    # close despite open blockers
+issues close <id> --wontfix                  # mark as won't fix
 issues relate <id> blocks <id>                # declare blocking relation
 issues graph --open-only                      # dependency tree
+issues board                                  # interactive Kanban board
 
 ## Bulk Operations
 issues batch close --label <label>            # close all matching issues

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strings"
+	"unicode"
 )
 
 var umlautMap = map[rune]string{
@@ -11,7 +12,6 @@ var umlautMap = map[rune]string{
 	'Ä': "ae", 'Ö': "oe", 'Ü': "ue",
 }
 
-var allowedChars = regexp.MustCompile(`[^a-z0-9 -]`)
 var multiDash = regexp.MustCompile(`-{2,}`)
 
 func GenerateSlug(title string) string {
@@ -28,26 +28,36 @@ func GenerateSlug(title string) string {
 	}
 	s = buf.String()
 
-	// Remove everything except a-z, 0-9, space, dash
-	s = allowedChars.ReplaceAllString(s, "")
-
-	// Replace spaces with dashes
-	s = strings.ReplaceAll(s, " ", "-")
+	// Keep letters and digits (including non-ASCII scripts), turn whitespace
+	// and dashes into a single separator, drop everything else.
+	buf.Reset()
+	for _, r := range s {
+		switch {
+		case unicode.IsLetter(r) || unicode.IsDigit(r):
+			buf.WriteRune(r)
+		case unicode.IsSpace(r) || r == '-':
+			buf.WriteByte('-')
+		}
+	}
+	s = buf.String()
 
 	// Collapse multiple dashes
 	s = multiDash.ReplaceAllString(s, "-")
 
-	// Truncate to 40 characters
-	if len(s) > 40 {
-		s = s[:40]
+	// Truncate to 40 characters (runes, not bytes)
+	if runes := []rune(s); len(runes) > 40 {
+		s = string(runes[:40])
 	}
 
-	// Strip trailing dash
-	s = strings.TrimRight(s, "-")
+	// Strip leading and trailing dashes
+	s = strings.Trim(s, "-")
 
 	return s
 }
 
 func Filename(id int, slug string) string {
+	if slug == "" {
+		slug = "issue"
+	}
 	return fmt.Sprintf("%04d-%s.md", id, slug)
 }

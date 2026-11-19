@@ -1,6 +1,8 @@
 package issue
 
 import (
+	"os"
+
 	"github.com/steviee/git-issues/internal/config"
 	"github.com/steviee/git-issues/internal/git"
 )
@@ -34,16 +36,13 @@ func AddRelation(issuesDir string, sourceID int, relation string, targetID int, 
 	AddToSlice(source, relation, targetID)
 	AddToSlice(target, Inverse(relation), sourceID)
 
-	if err := Save(issuesDir, source); err != nil {
-		return err
-	}
-	if err := Save(issuesDir, target); err != nil {
+	if err := savePair(issuesDir, source, target); err != nil {
 		return err
 	}
 
 	if cfg.AutoStage {
-		git.Stage(source.FilePath)
-		git.Stage(target.FilePath)
+		_ = git.Stage(source.FilePath)
+		_ = git.Stage(target.FilePath)
 	}
 
 	return nil
@@ -62,18 +61,32 @@ func RemoveRelation(issuesDir string, sourceID int, relation string, targetID in
 	RemoveFromSlice(source, relation, targetID)
 	RemoveFromSlice(target, Inverse(relation), sourceID)
 
-	if err := Save(issuesDir, source); err != nil {
-		return err
-	}
-	if err := Save(issuesDir, target); err != nil {
+	if err := savePair(issuesDir, source, target); err != nil {
 		return err
 	}
 
 	if cfg.AutoStage {
-		git.Stage(source.FilePath)
-		git.Stage(target.FilePath)
+		_ = git.Stage(source.FilePath)
+		_ = git.Stage(target.FilePath)
 	}
 
+	return nil
+}
+
+// savePair writes two issues and restores the first one if the second write
+// fails, so a relation is never left half-written on disk.
+func savePair(issuesDir string, first, second *Issue) error {
+	backup, backupErr := os.ReadFile(first.FilePath)
+
+	if err := Save(issuesDir, first); err != nil {
+		return err
+	}
+	if err := Save(issuesDir, second); err != nil {
+		if backupErr == nil {
+			_ = os.WriteFile(first.FilePath, backup, 0644)
+		}
+		return err
+	}
 	return nil
 }
 

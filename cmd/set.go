@@ -39,18 +39,18 @@ var setCmd = &cobra.Command{
 
 		iss, err := issue.LoadByID(issuesDir, id)
 		if err != nil {
-			return fmt.Errorf("Error: issue #%d not found", id)
+			return fmt.Errorf("issue #%d not found", id)
 		}
 
 		switch field {
 		case "priority":
 			if !contains(issue.ValidPriorities, value) {
-				return fmt.Errorf("Error: invalid priority %q, must be one of: %s", value, strings.Join(issue.ValidPriorities, ", "))
+				return fmt.Errorf("invalid priority %q, must be one of: %s", value, strings.Join(issue.ValidPriorities, ", "))
 			}
 			iss.Priority = value
 		case "status":
 			if !contains(issue.ValidStatuses, value) {
-				return fmt.Errorf("Error: invalid status %q, must be one of: %s", value, strings.Join(issue.ValidStatuses, ", "))
+				return fmt.Errorf("invalid status %q, must be one of: %s", value, strings.Join(issue.ValidStatuses, ", "))
 			}
 			iss.Status = value
 			if value == "closed" || value == "wontfix" {
@@ -60,7 +60,7 @@ var setCmd = &cobra.Command{
 			}
 		case "title":
 			if strings.TrimSpace(value) == "" {
-				return fmt.Errorf("Error: title must not be empty")
+				return fmt.Errorf("title must not be empty")
 			}
 			iss.Title = value
 		case "label":
@@ -79,7 +79,7 @@ var setCmd = &cobra.Command{
 				}
 			}
 		default:
-			return fmt.Errorf("Error: unknown field %q, must be one of: priority, status, title, label", field)
+			return fmt.Errorf("unknown field %q, must be one of: priority, status, title, label", field)
 		}
 
 		if err := issue.Save(issuesDir, iss); err != nil {
@@ -87,7 +87,7 @@ var setCmd = &cobra.Command{
 		}
 
 		if cfg.AutoStage {
-			git.Stage(iss.FilePath)
+			_ = git.Stage(iss.FilePath)
 		}
 
 		fmt.Printf("Updated #%d: %s = %s\n", id, field, value)

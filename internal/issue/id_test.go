@@ -99,6 +99,46 @@ func TestNextID_IgnoresNonMdFiles(t *testing.T) {
 	}
 }
 
+func TestNextID_CorruptedHighestFileStillReservesID(t *testing.T) {
+	dir := t.TempDir()
+
+	writeTestIssue(t, dir, 9, "0009-good.md")
+	if err := os.WriteFile(filepath.Join(dir, "0010-corrupted.md"), []byte("not an issue"), 0644); err != nil {
+		t.Fatalf("failed to write corrupted file: %v", err)
+	}
+
+	got, err := NextID(dir)
+	if err != nil {
+		t.Fatalf("NextID() returned error: %v", err)
+	}
+	if got != 11 {
+		t.Errorf("NextID() with corrupted #10 = %d, want 11 (ID must not be reused)", got)
+	}
+}
+
+func TestIDFromFilename(t *testing.T) {
+	tests := []struct {
+		name string
+		want int
+		ok   bool
+	}{
+		{"0007-login-bug.md", 7, true},
+		{"12345-big.md", 12345, true},
+		{"0001-.md", 1, true},
+		{"no-id.md", 0, false},
+		{".agent.md", 0, false},
+		{"0000-zero.md", 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := IDFromFilename(tt.name)
+			if got != tt.want || ok != tt.ok {
+				t.Errorf("IDFromFilename(%q) = (%d, %v), want (%d, %v)", tt.name, got, ok, tt.want, tt.ok)
+			}
+		})
+	}
+}
+
 func TestNextID_IgnoresDotFiles(t *testing.T) {
 	dir := t.TempDir()
 

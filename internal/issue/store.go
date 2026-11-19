@@ -45,11 +45,42 @@ func LoadAll(issuesDir string) ([]*Issue, error) {
 		}
 		issue, err := ParseFile(filepath.Join(issuesDir, name))
 		if err != nil {
+			fmt.Fprintf(os.Stderr, "Warning: skipping issue file %s: %v\n", name, err)
 			continue
 		}
 		issues = append(issues, issue)
 	}
 	return issues, nil
+}
+
+// BrokenFile describes an issue file that could not be parsed.
+type BrokenFile struct {
+	Path string
+	Err  error
+}
+
+// BrokenFiles returns issue files that LoadAll would silently skip.
+func BrokenFiles(issuesDir string) ([]BrokenFile, error) {
+	entries, err := os.ReadDir(issuesDir)
+	if err != nil {
+		return nil, err
+	}
+
+	var broken []BrokenFile
+	for _, entry := range entries {
+		if entry.IsDir() {
+			continue
+		}
+		name := entry.Name()
+		if !strings.HasSuffix(name, ".md") || strings.HasPrefix(name, ".") {
+			continue
+		}
+		path := filepath.Join(issuesDir, name)
+		if _, err := ParseFile(path); err != nil {
+			broken = append(broken, BrokenFile{Path: path, Err: err})
+		}
+	}
+	return broken, nil
 }
 
 func LoadByID(issuesDir string, id int) (*Issue, error) {

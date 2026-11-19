@@ -39,7 +39,7 @@ var claimCmd = &cobra.Command{
 
 		iss, err := issue.LoadByID(issuesDir, id)
 		if err != nil {
-			return fmt.Errorf("Error: issue #%d not found", id)
+			return fmt.Errorf("issue #%d not found", id)
 		}
 
 		iss.Status = "in-progress"
@@ -50,7 +50,7 @@ var claimCmd = &cobra.Command{
 		}
 
 		if cfg.AutoStage {
-			git.Stage(iss.FilePath)
+			_ = git.Stage(iss.FilePath)
 		}
 
 		fmt.Printf("Claimed: #%d %s\n", id, iss.Title)
@@ -81,7 +81,7 @@ var doneCmd = &cobra.Command{
 
 		iss, err := issue.LoadByID(issuesDir, id)
 		if err != nil {
-			return fmt.Errorf("Error: issue #%d not found", id)
+			return fmt.Errorf("issue #%d not found", id)
 		}
 
 		iss.Status = "closed"
@@ -92,7 +92,7 @@ var doneCmd = &cobra.Command{
 		}
 
 		if cfg.AutoStage {
-			git.Stage(iss.FilePath)
+			_ = git.Stage(iss.FilePath)
 		}
 
 		fmt.Printf("Done: #%d %s\n", id, iss.Title)
@@ -129,7 +129,7 @@ var blockedCmd = &cobra.Command{
 			}
 			iss, ok := issueMap[id]
 			if !ok {
-				return fmt.Errorf("Error: issue #%d not found", id)
+				return fmt.Errorf("issue #%d not found", id)
 			}
 
 			if len(iss.Relations.DependsOn) == 0 {

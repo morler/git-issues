@@ -11,11 +11,13 @@ import (
 	"github.com/steviee/git-issues/internal/issue"
 
 	"github.com/spf13/cobra"
+	"golang.org/x/term"
 )
 
 func init() {
 	closeCmd.Flags().Bool("wontfix", false, "Close as wontfix")
 	closeCmd.Flags().String("reason", "", "Reason for closing")
+	closeCmd.Flags().Bool("force", false, "Close even if there are open blockers (skips the prompt)")
 	rootCmd.AddCommand(closeCmd)
 }
 
@@ -41,24 +43,19 @@ var closeCmd = &cobra.Command{
 
 		iss, err := issue.LoadByID(issuesDir, id)
 		if err != nil {
-			return fmt.Errorf("Error: issue #%d not found", id)
+			return fmt.Errorf("issue #%d not found", id)
 		}
 
 		// Check for open blockers
+		force, _ := cmd.Flags().GetBool("force")
 		if len(iss.Relations.DependsOn) > 0 {
-			var blockers []string
-			for _, depID := range iss.Relations.DependsOn {
-				dep, err := issue.LoadByID(issuesDir, depID)
-				if err != nil {
-					continue
-				}
-				if dep.Status == "open" || dep.Status == "in-progress" {
-					blockers = append(blockers, fmt.Sprintf("#%d (%s)", dep.ID, dep.Title))
-				}
-			}
-			if len(blockers) > 0 {
+			blockers := openBlockers(issuesDir, iss)
+			if len(blockers) > 0 && !force {
 				for _, b := range blockers {
 					fmt.Fprintf(os.Stderr, "Warning: #%d has open blocker: %s\n", id, b)
+				}
+				if !stdinIsTerminal() {
+					return fmt.Errorf("refusing to close #%d with open blockers in non-interactive mode (use --force)", id)
 				}
 				fmt.Fprint(os.Stderr, "Close anyway? [y/N] ")
 				reader := bufio.NewReader(os.Stdin)
@@ -93,10 +90,28 @@ var closeCmd = &cobra.Command{
 		}
 
 		if cfg.AutoStage {
-			git.Stage(iss.FilePath)
+			_ = git.Stage(iss.FilePath)
 		}
 
 		fmt.Printf("Closed: #%d\n", id)
 		return nil
 	},
+}
+
+func stdinIsTerminal() bool {
+	return term.IsTerminal(int(os.Stdin.Fd()))
+}
+
+func openBlockers(issuesDir string, iss *issue.Issue) []string {
+	var blockers []string
+	for _, depID := range iss.Relations.DependsOn {
+		dep, err := issue.LoadByID(issuesDir, depID)
+		if err != nil {
+			continue
+		}
+		if dep.Status == "open" || dep.Status == "in-progress" {
+			blockers = append(blockers, fmt.Sprintf("#%d (%s)", dep.ID, dep.Title))
+		}
+	}
+	return blockers
 }

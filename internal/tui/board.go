@@ -108,7 +108,7 @@ func (m *Model) watchFiles() tea.Cmd {
 		return nil
 	}
 	if err := w.Add(m.issuesDir); err != nil {
-		w.Close()
+		_ = w.Close()
 		return nil
 	}
 	m.watcher = w
@@ -184,9 +184,15 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.populateColumns(filtered)
 		}
 		// Re-start the watcher for the next change
+		if m.watcher != nil {
+			_ = m.watcher.Close()
+			m.watcher = nil
+		}
 		return m, m.watchFiles()
 
 	case tea.KeyMsg:
+		// Clear the previous error once the user interacts.
+		m.err = nil
 		// Detail view: Esc/quit or forward to viewport
 		if m.showDetail {
 			switch {
@@ -195,7 +201,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				return m, nil
 			case key.Matches(msg, m.keys.Quit):
 				if m.watcher != nil {
-					m.watcher.Close()
+					_ = m.watcher.Close()
 				}
 				return m, tea.Quit
 			default:
@@ -208,7 +214,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		switch {
 		case key.Matches(msg, m.keys.Quit):
 			if m.watcher != nil {
-				m.watcher.Close()
+				_ = m.watcher.Close()
 			}
 			return m, tea.Quit
 
@@ -280,7 +286,7 @@ func (m *Model) moveIssue(direction int) tea.Cmd {
 	return func() tea.Msg {
 		err := issue.Save(issuesDir, iss)
 		if err == nil && autoStage {
-			git.Stage(filePath)
+			_ = git.Stage(filePath)
 		}
 		return savedMsg{err: err}
 	}
@@ -316,7 +322,6 @@ func (m Model) boardView() string {
 	if m.err != nil {
 		help = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render(
 			fmt.Sprintf(" Error: %s", m.err)) + "\n" + help
-		m.err = nil // show once
 	}
 
 	return board + "\n" + help
