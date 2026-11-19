@@ -4,7 +4,7 @@ import { Copy, Check } from 'lucide-react';
 export default function InstallCommand() {
   const [copied, setCopied] = useState(false);
 
-  const command = 'go install github.com/steviee/git-issues@latest';
+  const command = 'go install github.com/steviee/git-issues/cmd/issues@latest';
 
   const handleCopy = async () => {
     try {

@@ -6,6 +6,9 @@ priority: critical
 labels:
     - bug
     - docs
+relations:
+    related-to:
+        - 20
 created: "2026-11-19"
 updated: "2026-11-19"
 closed: "2026-11-19"

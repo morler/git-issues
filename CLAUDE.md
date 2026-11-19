@@ -47,7 +47,6 @@ git-issues/
       stage.go       ← git add wrapper
     config/
       config.go      ← .issues/.config.yml
-  main.go
   go.mod
   go.sum
   README.md
