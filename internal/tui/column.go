@@ -88,12 +88,11 @@ func (c *Column) Render(width, height int, active bool) string {
 	if active {
 		headerStyle = activeColumnHeaderStyle
 	}
-	header := headerStyle.Width(width - 2).Render(title)
+	header := headerStyle.Width(width - columnChromeWidth).Render(title)
 
 	// Calculate available card space
-	innerWidth := width - 2 // column border
-	cardHeight := 4         // approx lines per card (border + content)
-	visibleCards := (height - 3) / cardHeight
+	innerWidth := width - columnChromeWidth
+	visibleCards := (height - columnChromeHeight) / cardRowHeight
 	if visibleCards < 1 {
 		visibleCards = 1
 	}
@@ -138,7 +137,7 @@ func (c *Column) Render(width, height int, active bool) string {
 	if body == "" {
 		bodyLines = 0
 	}
-	targetLines := height - 3 // header + border
+	targetLines := height - columnChromeHeight // header + border
 	for bodyLines < targetLines {
 		body += "\n"
 		bodyLines++

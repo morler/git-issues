@@ -11,9 +11,9 @@ import (
 
 // RenderCard renders an issue as a card for the board.
 func RenderCard(iss *issue.Issue, width int, selected bool) string {
-	style := cardStyle.Width(width - 2) // account for border
+	style := cardStyle.Width(width - cardBorderWidth) // account for border
 	if selected {
-		style = selectedCardStyle.Width(width - 2)
+		style = selectedCardStyle.Width(width - cardBorderWidth)
 	}
 
 	// Priority indicator
@@ -25,10 +25,10 @@ func RenderCard(iss *issue.Issue, width int, selected bool) string {
 	priStr := priStyle.Render(strings.ToUpper(iss.Priority))
 
 	// ID line
-	idLine := fmt.Sprintf("#%-4d %s", iss.ID, priStr)
+	idLine := fmt.Sprintf("#%-*d %s", cardIDWidth, iss.ID, priStr)
 
 	// Title (truncate to fit, by display width so multi-byte text is not cut)
-	maxTitleLen := width - 4
+	maxTitleLen := width - cardTextInset
 	title := iss.Title
 	if maxTitleLen > 0 {
 		title = runewidth.Truncate(title, maxTitleLen, "…")

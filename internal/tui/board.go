@@ -1,15 +1,9 @@
 package tui
 
 import (
-	"fmt"
-	"strings"
-	"time"
-
 	"github.com/charmbracelet/bubbles/key"
 	"github.com/charmbracelet/bubbles/viewport"
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/charmbracelet/glamour"
-	"github.com/charmbracelet/lipgloss"
 	"github.com/fsnotify/fsnotify"
 	"github.com/steviee/git-issues/internal/config"
 	"github.com/steviee/git-issues/internal/git"
@@ -42,7 +36,7 @@ type FilterFunc func(*issue.Issue) bool
 
 // Model is the main bubbletea model for the board.
 type Model struct {
-	columns    [4]*Column
+	columns    []*Column
 	activeCol  int
 	width      int
 	height     int
@@ -59,6 +53,7 @@ type Model struct {
 // NewModel creates a board model from the given issues.
 func NewModel(issues []*issue.Issue, issuesDir string, cfg *config.Config, filters ...FilterFunc) Model {
 	m := Model{
+		columns:   make([]*Column, len(statusOrder)),
 		keys:      DefaultKeyMap(),
 		issuesDir: issuesDir,
 		cfg:       cfg,
@@ -72,13 +67,14 @@ func NewModel(issues []*issue.Issue, issuesDir string, cfg *config.Config, filte
 // populateColumns clears columns and fills them from the issue list.
 func (m *Model) populateColumns(issues []*issue.Issue) {
 	// Preserve cursor positions per status
-	cursors := [4]int{}
-	for i := range m.columns {
-		if m.columns[i] != nil {
-			cursors[i] = m.columns[i].Cursor
+	cursors := make([]int, len(m.columns))
+	for i, col := range m.columns {
+		if col != nil {
+			cursors[i] = col.Cursor
 		}
 	}
 
+	m.columns = make([]*Column, len(statusOrder))
 	for i, status := range statusOrder {
 		m.columns[i] = NewColumn(status)
 		for _, iss := range issues {
@@ -98,65 +94,11 @@ func (m Model) Init() tea.Cmd {
 	return m.watchFiles()
 }
 
-// watchFiles starts an fsnotify watcher on the issues directory.
-func (m *Model) watchFiles() tea.Cmd {
-	if m.issuesDir == "" {
-		return nil
-	}
-	w, err := fsnotify.NewWatcher()
-	if err != nil {
-		return nil
-	}
-	if err := w.Add(m.issuesDir); err != nil {
-		_ = w.Close()
-		return nil
-	}
-	m.watcher = w
-
-	return func() tea.Msg {
-		// Debounce: wait for events, then coalesce into one reload.
-		for {
-			select {
-			case ev, ok := <-w.Events:
-				if !ok {
-					return nil
-				}
-				if ev.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) != 0 {
-					// Short debounce to coalesce rapid writes
-					time.Sleep(200 * time.Millisecond)
-					// Drain any queued events
-					for {
-						select {
-						case _, ok := <-w.Events:
-							if !ok {
-								return reloadMsg{}
-							}
-						default:
-							return reloadMsg{}
-						}
-					}
-				}
-			case _, ok := <-w.Errors:
-				if !ok {
-					return nil
-				}
-			}
-		}
-	}
-}
-
 // Update implements tea.Model.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
-		m.width = msg.Width
-		m.height = msg.Height
-		if m.showDetail {
-			if iss := m.columns[m.activeCol].Selected(); iss != nil {
-				m.initDetailViewport(iss)
-			}
-		}
-		return m, nil
+		return m.resize(msg), nil
 
 	case savedMsg:
 		if msg.err != nil {
@@ -165,96 +107,125 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case reloadMsg:
-		issues, err := issue.LoadAll(m.issuesDir)
-		if err == nil {
-			// Apply filters
-			var filtered []*issue.Issue
-			for _, iss := range issues {
-				keep := true
-				for _, f := range m.filters {
-					if !f(iss) {
-						keep = false
-						break
-					}
-				}
-				if keep {
-					filtered = append(filtered, iss)
-				}
-			}
-			m.populateColumns(filtered)
-		}
-		// Re-start the watcher for the next change
-		if m.watcher != nil {
-			_ = m.watcher.Close()
-			m.watcher = nil
-		}
-		return m, m.watchFiles()
+		return m.reload()
 
 	case tea.KeyMsg:
-		// Clear the previous error once the user interacts.
-		m.err = nil
-		// Detail view: Esc/quit or forward to viewport
-		if m.showDetail {
-			switch {
-			case key.Matches(msg, m.keys.Escape):
-				m.showDetail = false
-				return m, nil
-			case key.Matches(msg, m.keys.Quit):
-				if m.watcher != nil {
-					_ = m.watcher.Close()
-				}
-				return m, tea.Quit
-			default:
-				var cmd tea.Cmd
-				m.detailVP, cmd = m.detailVP.Update(msg)
-				return m, cmd
+		return m.handleKey(msg)
+	}
+
+	return m, nil
+}
+
+// resize stores the terminal size and re-fits an open detail viewport.
+func (m Model) resize(msg tea.WindowSizeMsg) Model {
+	m.width = msg.Width
+	m.height = msg.Height
+	if m.showDetail {
+		if iss := m.columns[m.activeCol].Selected(); iss != nil {
+			m.initDetailViewport(iss)
+		}
+	}
+	return m
+}
+
+// reload re-reads the issues directory and restarts the file watcher.
+func (m Model) reload() (tea.Model, tea.Cmd) {
+	issues, err := issue.LoadAll(m.issuesDir)
+	if err == nil {
+		m.populateColumns(m.applyFilters(issues))
+	}
+	m.stopWatcher()
+	return m, m.watchFiles()
+}
+
+// applyFilters keeps only the issues accepted by every configured predicate.
+func (m Model) applyFilters(issues []*issue.Issue) []*issue.Issue {
+	if len(m.filters) == 0 {
+		return issues
+	}
+
+	filtered := make([]*issue.Issue, 0, len(issues))
+	for _, iss := range issues {
+		keep := true
+		for _, filter := range m.filters {
+			if !filter(iss) {
+				keep = false
+				break
 			}
 		}
+		if keep {
+			filtered = append(filtered, iss)
+		}
+	}
+	return filtered
+}
 
-		switch {
-		case key.Matches(msg, m.keys.Quit):
-			if m.watcher != nil {
-				_ = m.watcher.Close()
-			}
-			return m, tea.Quit
+// handleKey dispatches a key press to the detail view or the board.
+func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Clear the previous error once the user interacts.
+	m.err = nil
 
-		case key.Matches(msg, m.keys.Left):
-			if m.activeCol > 0 {
-				m.activeCol--
-			}
+	if m.showDetail {
+		return m.handleDetailKey(msg)
+	}
 
-		case key.Matches(msg, m.keys.Right):
-			if m.activeCol < 3 {
-				m.activeCol++
-			}
+	switch {
+	case key.Matches(msg, m.keys.Quit):
+		m.stopWatcher()
+		return m, tea.Quit
 
-		case key.Matches(msg, m.keys.Down):
-			m.columns[m.activeCol].CursorDown()
+	case key.Matches(msg, m.keys.Left):
+		if m.activeCol > 0 {
+			m.activeCol--
+		}
 
-		case key.Matches(msg, m.keys.Up):
-			m.columns[m.activeCol].CursorUp()
+	case key.Matches(msg, m.keys.Right):
+		if m.activeCol < len(m.columns)-1 {
+			m.activeCol++
+		}
 
-		case key.Matches(msg, m.keys.MoveLeft):
-			return m, m.moveIssue(-1)
+	case key.Matches(msg, m.keys.Down):
+		m.columns[m.activeCol].CursorDown()
 
-		case key.Matches(msg, m.keys.MoveRight):
-			return m, m.moveIssue(1)
+	case key.Matches(msg, m.keys.Up):
+		m.columns[m.activeCol].CursorUp()
 
-		case key.Matches(msg, m.keys.Enter):
-			if iss := m.columns[m.activeCol].Selected(); iss != nil {
-				m.showDetail = true
-				m.initDetailViewport(iss)
-			}
+	case key.Matches(msg, m.keys.MoveLeft):
+		return m, m.moveIssue(-1)
+
+	case key.Matches(msg, m.keys.MoveRight):
+		return m, m.moveIssue(1)
+
+	case key.Matches(msg, m.keys.Enter):
+		if iss := m.columns[m.activeCol].Selected(); iss != nil {
+			m.showDetail = true
+			m.initDetailViewport(iss)
 		}
 	}
 
 	return m, nil
 }
 
+// handleDetailKey handles keys while the detail view is open.
+func (m Model) handleDetailKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch {
+	case key.Matches(msg, m.keys.Escape):
+		m.showDetail = false
+		return m, nil
+	case key.Matches(msg, m.keys.Quit):
+		m.stopWatcher()
+		return m, tea.Quit
+	default:
+		var cmd tea.Cmd
+		m.detailVP, cmd = m.detailVP.Update(msg)
+		return m, cmd
+	}
+}
+
 // moveIssue moves the selected issue to an adjacent column.
 func (m *Model) moveIssue(direction int) tea.Cmd {
 	targetCol := m.activeCol + direction
-	if targetCol < 0 || targetCol > 3 {
+	if targetCol < 0 || targetCol >= len(m.columns) {
 		return nil
 	}
 
@@ -268,13 +239,7 @@ func (m *Model) moveIssue(direction int) tea.Cmd {
 	col.Remove(iss.ID)
 
 	// Update status
-	newStatus := statusOrder[targetCol]
-	iss.Status = newStatus
-	if newStatus == "closed" || newStatus == "wontfix" {
-		iss.Closed = issue.Today()
-	} else {
-		iss.Closed = ""
-	}
+	applyStatus(iss, statusOrder[targetCol])
 
 	// Add to target column
 	m.columns[targetCol].Add(iss)
@@ -292,136 +257,12 @@ func (m *Model) moveIssue(direction int) tea.Cmd {
 	}
 }
 
-// View implements tea.Model.
-func (m Model) View() string {
-	if m.width == 0 {
-		return "Loading..."
+// applyStatus sets the issue status and keeps the closed date in sync.
+func applyStatus(iss *issue.Issue, status string) {
+	iss.Status = status
+	if status == "closed" || status == "wontfix" {
+		iss.Closed = issue.Today()
+	} else {
+		iss.Closed = ""
 	}
-
-	if m.showDetail {
-		return m.detailView()
-	}
-
-	return m.boardView()
-}
-
-func (m Model) boardView() string {
-	colWidth := m.width / 4
-	colHeight := m.height - 3 // room for status bar
-
-	var cols []string
-	for i := 0; i < 4; i++ {
-		active := i == m.activeCol
-		cols = append(cols, m.columns[i].Render(colWidth, colHeight, active))
-	}
-
-	board := lipgloss.JoinHorizontal(lipgloss.Top, cols...)
-
-	help := statusBarStyle.Render(" h/l: column  j/k: navigate  H/L: move issue  Enter: details  q: quit")
-
-	if m.err != nil {
-		help = lipgloss.NewStyle().Foreground(lipgloss.Color("196")).Render(
-			fmt.Sprintf(" Error: %s", m.err)) + "\n" + help
-	}
-
-	return board + "\n" + help
-}
-
-// initDetailViewport builds the header + rendered markdown body and sets them
-// as viewport content. Called once when Enter is pressed.
-func (m *Model) initDetailViewport(iss *issue.Issue) {
-	// Available content width inside the detail border (border=1 + padding=2 on each side)
-	contentWidth := m.width - 6
-	if contentWidth < 20 {
-		contentWidth = 20
-	}
-
-	separator := strings.Repeat("━", contentWidth)
-
-	var b strings.Builder
-	b.WriteString(separator + "\n")
-	b.WriteString(detailTitleStyle.Render(
-		fmt.Sprintf("Issue #%d  ·  %s  ·  %s", iss.ID, iss.Priority, iss.Status)) + "\n")
-	b.WriteString(detailTitleStyle.Render(iss.Title) + "\n")
-	b.WriteString(separator + "\n")
-
-	if len(iss.Labels) > 0 {
-		b.WriteString(detailFieldStyle.Render("Labels:   ") + strings.Join(iss.Labels, ", ") + "\n")
-	}
-	b.WriteString(detailFieldStyle.Render("Created:  ") + iss.Created + "\n")
-	b.WriteString(detailFieldStyle.Render("Updated:  ") + iss.Updated + "\n")
-	if iss.Closed != "" {
-		b.WriteString(detailFieldStyle.Render("Closed:   ") + iss.Closed + "\n")
-	}
-
-	// Relations
-	hasRelations := len(iss.Relations.Blocks) > 0 || len(iss.Relations.DependsOn) > 0 ||
-		len(iss.Relations.RelatedTo) > 0 || len(iss.Relations.Duplicates) > 0
-	if hasRelations {
-		b.WriteString("\n" + detailTitleStyle.Render("Relations") + "\n")
-		if len(iss.Relations.Blocks) > 0 {
-			b.WriteString(detailFieldStyle.Render("  Blocks:     ") + formatIDs(iss.Relations.Blocks) + "\n")
-		}
-		if len(iss.Relations.DependsOn) > 0 {
-			b.WriteString(detailFieldStyle.Render("  Depends on: ") + formatIDs(iss.Relations.DependsOn) + "\n")
-		}
-		if len(iss.Relations.RelatedTo) > 0 {
-			b.WriteString(detailFieldStyle.Render("  Related to: ") + formatIDs(iss.Relations.RelatedTo) + "\n")
-		}
-		if len(iss.Relations.Duplicates) > 0 {
-			b.WriteString(detailFieldStyle.Render("  Duplicates: ") + formatIDs(iss.Relations.Duplicates) + "\n")
-		}
-	}
-
-	if iss.Body != "" {
-		b.WriteString("\n" + separator + "\n")
-		glamourStyle := "dark"
-		if !lipgloss.HasDarkBackground() {
-			glamourStyle = "light"
-		}
-		r, err := glamour.NewTermRenderer(
-			glamour.WithStandardStyle(glamourStyle),
-			glamour.WithWordWrap(contentWidth),
-		)
-		if err == nil {
-			rendered, renderErr := r.Render(iss.Body)
-			if renderErr == nil {
-				b.WriteString(rendered)
-			} else {
-				b.WriteString("\n" + iss.Body)
-			}
-		} else {
-			b.WriteString("\n" + iss.Body)
-		}
-	}
-
-	// Viewport height = terminal height minus border/padding (4) minus status bar (2)
-	vpHeight := m.height - 6
-	if vpHeight < 5 {
-		vpHeight = 5
-	}
-
-	m.detailVP = viewport.New(contentWidth, vpHeight)
-	m.detailVP.MouseWheelEnabled = true
-	m.detailVP.SetContent(b.String())
-}
-
-func (m Model) detailView() string {
-	if m.columns[m.activeCol].Selected() == nil {
-		return "No issue selected"
-	}
-
-	help := statusBarStyle.Render(" j/k: scroll  Esc: back  q: quit")
-
-	content := m.detailVP.View() + "\n" + help
-
-	return detailBorderStyle.Width(m.width - 4).Render(content)
-}
-
-func formatIDs(ids []int) string {
-	strs := make([]string, len(ids))
-	for i, id := range ids {
-		strs[i] = fmt.Sprintf("#%d", id)
-	}
-	return strings.Join(strs, ", ")
 }

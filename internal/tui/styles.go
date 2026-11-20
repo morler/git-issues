@@ -54,6 +54,10 @@ var (
 			Foreground(lipgloss.Color("243")).
 			MarginTop(1)
 
+	// Error line above the status bar
+	errorStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color("196"))
+
 	// Detail view
 	detailBorderStyle = lipgloss.NewStyle().
 				Border(lipgloss.DoubleBorder()).
