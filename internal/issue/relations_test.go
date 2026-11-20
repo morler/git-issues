@@ -559,6 +559,42 @@ func TestAddRelationMissingTarget(t *testing.T) {
 	}
 }
 
+func TestSelfRelationRejected(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	self := &Issue{
+		ID:       1,
+		Title:    "Self issue",
+		Status:   "open",
+		Priority: "medium",
+		Labels:   []string{},
+		Created:  "2026-03-04",
+		Updated:  "2026-03-04",
+	}
+	createTestIssueFile(t, tmpDir, self)
+
+	cfg := &config.Config{AutoStage: false}
+
+	if err := AddRelation(tmpDir, 1, "blocks", 1, cfg); err == nil {
+		t.Fatal("AddRelation(1, blocks, 1) = nil, want error")
+	}
+	if err := RemoveRelation(tmpDir, 1, "blocks", 1, cfg); err == nil {
+		t.Fatal("RemoveRelation(1, blocks, 1) = nil, want error")
+	}
+
+	reloaded, err := LoadByID(tmpDir, 1)
+	if err != nil {
+		t.Fatalf("LoadByID(1) returned error: %v", err)
+	}
+	rel := reloaded.Relations
+	if len(rel.Blocks)+len(rel.DependsOn)+len(rel.RelatedTo)+len(rel.Duplicates) != 0 {
+		t.Errorf("self relation wrote entries: %+v", rel)
+	}
+	if reloaded.Title != "Self issue" {
+		t.Errorf("issue was rewritten: title = %q", reloaded.Title)
+	}
+}
+
 func TestSavePairRollsBackFirstOnFailure(t *testing.T) {
 	dir := t.TempDir()
 

@@ -155,6 +155,7 @@ func TestRelateCmdErrors(t *testing.T) {
 		{"unknown relation", []string{"relate", "1", "nope", "2"}, `invalid relation "nope", must be one of: blocks, depends-on, related-to, duplicates`},
 		{"missing source", []string{"relate", "99", "blocks", "2"}, "issue #99 not found"},
 		{"missing target", []string{"relate", "1", "blocks", "99"}, "issue #99 not found"},
+		{"self relation", []string{"relate", "1", "blocks", "1"}, "cannot relate issue #1 to itself"},
 	}
 
 	for _, tt := range tests {
@@ -289,6 +290,7 @@ func TestUnrelateCmdErrors(t *testing.T) {
 		{"unknown relation", []string{"unrelate", "1", "nope", "2"}, `invalid relation "nope", must be one of: blocks, depends-on, related-to, duplicates`},
 		{"missing source", []string{"unrelate", "99", "blocks", "2"}, "issue #99 not found"},
 		{"missing target", []string{"unrelate", "1", "blocks", "99"}, "issue #99 not found"},
+		{"self relation", []string{"unrelate", "1", "blocks", "1"}, "cannot unrelate issue #1 from itself"},
 	}
 
 	for _, tt := range tests {

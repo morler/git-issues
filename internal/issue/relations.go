@@ -1,6 +1,7 @@
 package issue
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/steviee/git-issues/internal/config"
@@ -24,6 +25,10 @@ func Inverse(relation string) string {
 }
 
 func AddRelation(issuesDir string, sourceID int, relation string, targetID int, cfg *config.Config) error {
+	if sourceID == targetID {
+		return fmt.Errorf("cannot relate issue #%d to itself", sourceID)
+	}
+
 	source, err := LoadByID(issuesDir, sourceID)
 	if err != nil {
 		return err
@@ -49,6 +54,10 @@ func AddRelation(issuesDir string, sourceID int, relation string, targetID int, 
 }
 
 func RemoveRelation(issuesDir string, sourceID int, relation string, targetID int, cfg *config.Config) error {
+	if sourceID == targetID {
+		return fmt.Errorf("cannot unrelate issue #%d from itself", sourceID)
+	}
+
 	source, err := LoadByID(issuesDir, sourceID)
 	if err != nil {
 		return err
