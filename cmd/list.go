@@ -68,7 +68,7 @@ var listCmd = &cobra.Command{
 			}
 			fmt.Println(strings.Join(ids, " "))
 		default:
-			printTable(filtered, issueMap)
+			printTable(filtered, issueMap, opts)
 		}
 
 		return nil
@@ -159,9 +159,21 @@ func sortIssues(issues []*issue.Issue, sortBy string) {
 	})
 }
 
-func printTable(issues []*issue.Issue, issueMap map[int]*issue.Issue) {
+// emptyListMessage names the active filters so an empty table is not mistaken
+// for an empty database.
+func emptyListMessage(opts filterOptions) string {
+	if opts.priority != "" || len(opts.labels) > 0 || opts.blocksID != 0 || opts.dependsOnID != 0 {
+		return "No matching issues found."
+	}
+	if opts.status == "all" {
+		return "No issues found."
+	}
+	return fmt.Sprintf("No %s issues found.", opts.status)
+}
+
+func printTable(issues []*issue.Issue, issueMap map[int]*issue.Issue, opts filterOptions) {
 	if len(issues) == 0 {
-		fmt.Println("No issues found.")
+		fmt.Println(emptyListMessage(opts))
 		return
 	}
 

@@ -238,7 +238,7 @@ func (c *checkContext) saveFixes(issuesDir string) error {
 
 func printCheckReport(report *checkReport) {
 	if len(report.errors) == 0 && len(report.warnings) == 0 {
-		fmt.Println("No issues found. Database is consistent.")
+		fmt.Println("No problems found. Database is consistent.")
 		return
 	}
 

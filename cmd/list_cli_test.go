@@ -88,15 +88,33 @@ func TestListCommandEmpty(t *testing.T) {
 	repo := newCLIRepo(t)
 
 	stdout, _ := listRun(t, repo)
-	if got := strings.TrimSpace(stdout); got != "No issues found." {
-		t.Errorf("empty table = %q, want %q", got, "No issues found.")
+	if got := strings.TrimSpace(stdout); got != "No open issues found." {
+		t.Errorf("empty table = %q, want %q", got, "No open issues found.")
 	}
 
-	// A filter that matches nothing also reports the empty table.
-	repo.seed(t, &issue.Issue{ID: 1, Title: "Only bug", Labels: []string{"bug"}})
+	// Closed issues do not turn the default view into an empty database.
+	repo.seed(t, &issue.Issue{ID: 1, Title: "Only closed", Status: "closed", Closed: "2026-02-02"})
+	stdout, _ = listRun(t, repo)
+	if got := strings.TrimSpace(stdout); got != "No open issues found." {
+		t.Errorf("closed-only table = %q, want %q", got, "No open issues found.")
+	}
+
+	// A filter that matches nothing names the filter instead of the database.
 	stdout, _ = listRun(t, repo, "--label", "missing")
+	if got := strings.TrimSpace(stdout); got != "No matching issues found." {
+		t.Errorf("filtered empty table = %q, want %q", got, "No matching issues found.")
+	}
+
+	stdout, _ = listRun(t, repo, "--status", "closed", "--priority", "high")
+	if got := strings.TrimSpace(stdout); got != "No matching issues found." {
+		t.Errorf("combined filter empty table = %q, want %q", got, "No matching issues found.")
+	}
+
+	// Only an unfiltered empty database reports no issues at all.
+	empty := newCLIRepo(t)
+	stdout, _ = listRun(t, empty, "--status", "all")
 	if got := strings.TrimSpace(stdout); got != "No issues found." {
-		t.Errorf("filtered empty table = %q, want %q", got, "No issues found.")
+		t.Errorf("unfiltered empty table = %q, want %q", got, "No issues found.")
 	}
 }
 

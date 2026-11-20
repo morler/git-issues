@@ -69,7 +69,7 @@ func TestCheckCLIConsistent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("check failed: %v", err)
 	}
-	wantContains(t, "stdout", stdout, "No issues found. Database is consistent.")
+	wantContains(t, "stdout", stdout, "No problems found. Database is consistent.")
 	if stderr != "" {
 		t.Errorf("unexpected stderr: %s", stderr)
 	}
@@ -127,7 +127,7 @@ func TestCheckCLIOrphanFix(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("third run exit code = %d, want 0 (stdout: %s, stderr: %s)", code, stdout, stderr)
 	}
-	wantContains(t, "stdout", stdout, "No issues found. Database is consistent.")
+	wantContains(t, "stdout", stdout, "No problems found. Database is consistent.")
 	if stderr != "" {
 		t.Errorf("unexpected stderr on third run: %s", stderr)
 	}
@@ -164,7 +164,7 @@ func TestCheckCLIFixSymmetry(t *testing.T) {
 	if code != 0 {
 		t.Fatalf("third run exit code = %d, want 0 (stdout: %s, stderr: %s)", code, stdout, stderr)
 	}
-	wantContains(t, "stdout", stdout, "No issues found. Database is consistent.")
+	wantContains(t, "stdout", stdout, "No problems found. Database is consistent.")
 }
 
 func TestCheckCLIValidationError(t *testing.T) {
