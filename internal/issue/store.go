@@ -29,12 +29,33 @@ func IssuesDir() (string, error) {
 }
 
 func LoadAll(issuesDir string) ([]*Issue, error) {
-	entries, err := os.ReadDir(issuesDir)
+	scan, err := scanIssues(issuesDir)
 	if err != nil {
 		return nil, err
 	}
 
-	var issues []*Issue
+	for _, bf := range scan.broken {
+		fmt.Fprintf(os.Stderr, "Warning: skipping issue file %s: %v\n", filepath.Base(bf.Path), bf.Err)
+	}
+	return scan.issues, nil
+}
+
+// issueScan is the result of reading the issues directory once.
+type issueScan struct {
+	names  []string     // issue file names that match the naming convention
+	issues []*Issue     // successfully parsed issues, in directory order
+	broken []BrokenFile // files that failed to parse, in directory order
+}
+
+// scanIssues reads issuesDir and parses every issue file, separating readable
+// issues from parse failures. Callers decide how to report the latter.
+func scanIssues(issuesDir string) (issueScan, error) {
+	entries, err := os.ReadDir(issuesDir)
+	if err != nil {
+		return issueScan{}, err
+	}
+
+	var scan issueScan
 	for _, entry := range entries {
 		if entry.IsDir() {
 			continue
@@ -43,14 +64,17 @@ func LoadAll(issuesDir string) ([]*Issue, error) {
 		if !strings.HasSuffix(name, ".md") || strings.HasPrefix(name, ".") {
 			continue
 		}
-		issue, err := ParseFile(filepath.Join(issuesDir, name))
+
+		path := filepath.Join(issuesDir, name)
+		iss, err := ParseFile(path)
+		scan.names = append(scan.names, name)
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "Warning: skipping issue file %s: %v\n", name, err)
+			scan.broken = append(scan.broken, BrokenFile{Path: path, Err: err})
 			continue
 		}
-		issues = append(issues, issue)
+		scan.issues = append(scan.issues, iss)
 	}
-	return issues, nil
+	return scan, nil
 }
 
 // BrokenFile describes an issue file that could not be parsed.
@@ -61,26 +85,11 @@ type BrokenFile struct {
 
 // BrokenFiles returns issue files that LoadAll would silently skip.
 func BrokenFiles(issuesDir string) ([]BrokenFile, error) {
-	entries, err := os.ReadDir(issuesDir)
+	scan, err := scanIssues(issuesDir)
 	if err != nil {
 		return nil, err
 	}
-
-	var broken []BrokenFile
-	for _, entry := range entries {
-		if entry.IsDir() {
-			continue
-		}
-		name := entry.Name()
-		if !strings.HasSuffix(name, ".md") || strings.HasPrefix(name, ".") {
-			continue
-		}
-		path := filepath.Join(issuesDir, name)
-		if _, err := ParseFile(path); err != nil {
-			broken = append(broken, BrokenFile{Path: path, Err: err})
-		}
-	}
-	return broken, nil
+	return scan.broken, nil
 }
 
 func LoadByID(issuesDir string, id int) (*Issue, error) {

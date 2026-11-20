@@ -2,8 +2,10 @@ package issue
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -166,6 +168,107 @@ func TestDelete(t *testing.T) {
 	_, err = LoadByID(dir, 1)
 	if err == nil {
 		t.Error("expected error after deletion")
+	}
+}
+
+// captureStderr captures everything fn writes to os.Stderr.
+func captureStderr(t *testing.T, fn func()) string {
+	t.Helper()
+	r, w, err := os.Pipe()
+	if err != nil {
+		t.Fatalf("pipe: %v", err)
+	}
+	old := os.Stderr
+	os.Stderr = w
+	defer func() {
+		os.Stderr = old
+		_ = w.Close()
+	}()
+
+	fn()
+
+	os.Stderr = old
+	if err := w.Close(); err != nil {
+		t.Fatalf("close stderr pipe: %v", err)
+	}
+	data, err := io.ReadAll(r)
+	if err != nil {
+		t.Fatalf("read stderr: %v", err)
+	}
+	return string(data)
+}
+
+func TestScanIssuesSeparatesBrokenFiles(t *testing.T) {
+	dir := t.TempDir()
+	writeIssueFile(t, dir, 1, "Valid issue")
+	if err := os.WriteFile(filepath.Join(dir, "0002-broken.md"), []byte("garbage\n"), 0o644); err != nil {
+		t.Fatalf("write broken file: %v", err)
+	}
+	// None of these count as issue files.
+	if err := os.WriteFile(filepath.Join(dir, ".agent.md"), []byte("garbage\n"), 0o644); err != nil {
+		t.Fatalf("write dotfile: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "notes.txt"), []byte("notes\n"), 0o644); err != nil {
+		t.Fatalf("write notes: %v", err)
+	}
+	if err := os.Mkdir(filepath.Join(dir, "nested.md"), 0o755); err != nil {
+		t.Fatalf("mkdir nested: %v", err)
+	}
+
+	scan, err := scanIssues(dir)
+	if err != nil {
+		t.Fatalf("scanIssues: %v", err)
+	}
+	if len(scan.names) != 2 {
+		t.Errorf("names = %v, want 2 issue files", scan.names)
+	}
+	if len(scan.issues) != 1 || scan.issues[0].ID != 1 {
+		t.Errorf("issues = %v, want only #1", scan.issues)
+	}
+	if len(scan.broken) != 1 || filepath.Base(scan.broken[0].Path) != "0002-broken.md" {
+		t.Errorf("broken = %v, want 0002-broken.md", scan.broken)
+	}
+}
+
+func TestLoadAllWarnsOnBrokenFiles(t *testing.T) {
+	dir := t.TempDir()
+	writeIssueFile(t, dir, 1, "Valid issue")
+	if err := os.WriteFile(filepath.Join(dir, "0002-broken.md"), []byte("garbage\n"), 0o644); err != nil {
+		t.Fatalf("write broken file: %v", err)
+	}
+
+	var issues []*Issue
+	var err error
+	stderr := captureStderr(t, func() { issues, err = LoadAll(dir) })
+	if err != nil {
+		t.Fatalf("LoadAll: %v", err)
+	}
+	if len(issues) != 1 || issues[0].ID != 1 {
+		t.Errorf("issues = %v, want only #1", issues)
+	}
+	for _, want := range []string{"Warning: skipping issue file 0002-broken.md", "file must start with ---"} {
+		if !strings.Contains(stderr, want) {
+			t.Errorf("stderr = %q, want it to contain %q", stderr, want)
+		}
+	}
+}
+
+func TestBrokenFilesReturnsUnparsableFiles(t *testing.T) {
+	dir := t.TempDir()
+	writeIssueFile(t, dir, 1, "Valid issue")
+	if err := os.WriteFile(filepath.Join(dir, "0002-broken.md"), []byte("garbage\n"), 0o644); err != nil {
+		t.Fatalf("write broken file: %v", err)
+	}
+
+	broken, err := BrokenFiles(dir)
+	if err != nil {
+		t.Fatalf("BrokenFiles: %v", err)
+	}
+	if len(broken) != 1 {
+		t.Fatalf("broken = %v, want one file", broken)
+	}
+	if filepath.Base(broken[0].Path) != "0002-broken.md" || broken[0].Err == nil {
+		t.Errorf("broken entry = %+v, want 0002-broken.md with a parse error", broken[0])
 	}
 }
 
