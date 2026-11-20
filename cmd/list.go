@@ -80,7 +80,8 @@ var listCmd = &cobra.Command{
 }
 
 func filterIssues(issues []*issue.Issue, status, priority string, labels []string, blocksID, dependsOnID int) []*issue.Issue {
-	var filtered []*issue.Issue
+	// Start non-nil so an empty result marshals as [] instead of null.
+	filtered := make([]*issue.Issue, 0, len(issues))
 	for _, iss := range issues {
 		if status != "all" && iss.Status != status {
 			continue

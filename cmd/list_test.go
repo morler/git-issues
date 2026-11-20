@@ -69,6 +69,18 @@ func TestFilterIssues(t *testing.T) {
 	}
 }
 
+func TestFilterIssuesNoMatchReturnsEmptySlice(t *testing.T) {
+	all := []*issue.Issue{testIssue(1, "open", "high", nil, nil, nil)}
+
+	got := filterIssues(all, "open", "critical", nil, 0, 0)
+	if got == nil {
+		t.Fatal("filterIssues returned nil for no matches, want an empty slice")
+	}
+	if len(got) != 0 {
+		t.Errorf("filterIssues returned %v, want empty", got)
+	}
+}
+
 func TestSortIssuesPriority(t *testing.T) {
 	all := []*issue.Issue{
 		testIssue(1, "open", "low", nil, nil, nil),

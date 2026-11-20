@@ -1,12 +1,13 @@
 ---
 id: 27
 title: list --format json prints null instead of [] when nothing matches
-status: open
+status: closed
 priority: low
 labels:
     - bug
 created: "2026-11-19"
-updated: "2026-11-19"
+updated: "2026-11-20"
+closed: "2026-11-20"
 ---
 
 Repro: `issues list --status all --priority critical --format json` on a database without critical issues prints `null`.

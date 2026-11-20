@@ -200,6 +200,16 @@ func TestListCommandJSON(t *testing.T) {
 	wantNotContains(t, "json output", stdout, "FilePath")
 }
 
+func TestListCommandJSONEmptyIsArray(t *testing.T) {
+	repo := newCLIRepo(t)
+	repo.seed(t, &issue.Issue{ID: 1, Title: "Open issue", Status: "open", Priority: "medium"})
+
+	stdout, _ := listRun(t, repo, "--format", "json", "--status", "all", "--priority", "critical")
+	if got := strings.TrimSpace(stdout); got != "[]" {
+		t.Errorf("json output with no matches = %q, want []", got)
+	}
+}
+
 func TestListCommandIDs(t *testing.T) {
 	repo := newCLIRepo(t)
 	repo.seed(t, &issue.Issue{ID: 1, Title: "Open one"})
