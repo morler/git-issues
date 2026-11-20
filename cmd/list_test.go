@@ -61,7 +61,13 @@ func TestFilterIssues(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			got := ids(filterIssues(all, tt.status, tt.priority, tt.labels, tt.blocksID, tt.dependsOnID))
+			got := ids(filterIssues(all, filterOptions{
+				status:      tt.status,
+				priority:    tt.priority,
+				labels:      tt.labels,
+				blocksID:    tt.blocksID,
+				dependsOnID: tt.dependsOnID,
+			}))
 			if !slices.Equal(got, tt.want) {
 				t.Errorf("filterIssues() = %v, want %v", got, tt.want)
 			}
@@ -72,7 +78,7 @@ func TestFilterIssues(t *testing.T) {
 func TestFilterIssuesNoMatchReturnsEmptySlice(t *testing.T) {
 	all := []*issue.Issue{testIssue(1, "open", "high", nil, nil, nil)}
 
-	got := filterIssues(all, "open", "critical", nil, 0, 0)
+	got := filterIssues(all, filterOptions{status: "open", priority: "critical"})
 	if got == nil {
 		t.Fatal("filterIssues returned nil for no matches, want an empty slice")
 	}

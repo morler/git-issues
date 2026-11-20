@@ -32,11 +32,7 @@ var listCmd = &cobra.Command{
 			return err
 		}
 
-		status, _ := cmd.Flags().GetString("status")
-		priority, _ := cmd.Flags().GetString("priority")
-		labels, _ := cmd.Flags().GetStringSlice("label")
-		blocksID, _ := cmd.Flags().GetInt("blocks")
-		dependsOnID, _ := cmd.Flags().GetInt("depends-on")
+		opts := filterOptionsFromFlags(cmd)
 		sortBy, _ := cmd.Flags().GetString("sort")
 		format, _ := cmd.Flags().GetString("format")
 
@@ -52,7 +48,7 @@ var listCmd = &cobra.Command{
 		}
 
 		// Filter
-		filtered := filterIssues(issues, status, priority, labels, blocksID, dependsOnID)
+		filtered := filterIssues(issues, opts)
 
 		// Sort
 		sortIssues(filtered, sortBy)
@@ -79,23 +75,43 @@ var listCmd = &cobra.Command{
 	},
 }
 
-func filterIssues(issues []*issue.Issue, status, priority string, labels []string, blocksID, dependsOnID int) []*issue.Issue {
+// filterOptions collects the `issues list` filter flags.
+type filterOptions struct {
+	status      string
+	priority    string
+	labels      []string
+	blocksID    int
+	dependsOnID int
+}
+
+// filterOptionsFromFlags reads the list filters from the command flags.
+func filterOptionsFromFlags(cmd *cobra.Command) filterOptions {
+	var opts filterOptions
+	opts.status, _ = cmd.Flags().GetString("status")
+	opts.priority, _ = cmd.Flags().GetString("priority")
+	opts.labels, _ = cmd.Flags().GetStringSlice("label")
+	opts.blocksID, _ = cmd.Flags().GetInt("blocks")
+	opts.dependsOnID, _ = cmd.Flags().GetInt("depends-on")
+	return opts
+}
+
+func filterIssues(issues []*issue.Issue, opts filterOptions) []*issue.Issue {
 	// Start non-nil so an empty result marshals as [] instead of null.
 	filtered := make([]*issue.Issue, 0, len(issues))
 	for _, iss := range issues {
-		if status != "all" && iss.Status != status {
+		if opts.status != "all" && iss.Status != opts.status {
 			continue
 		}
-		if priority != "" && iss.Priority != priority {
+		if opts.priority != "" && iss.Priority != opts.priority {
 			continue
 		}
-		if len(labels) > 0 && !hasAnyLabel(iss.Labels, labels) {
+		if len(opts.labels) > 0 && !hasAnyLabel(iss.Labels, opts.labels) {
 			continue
 		}
-		if blocksID != 0 && !containsInt(iss.Relations.Blocks, blocksID) {
+		if opts.blocksID != 0 && !containsInt(iss.Relations.Blocks, opts.blocksID) {
 			continue
 		}
-		if dependsOnID != 0 && !containsInt(iss.Relations.DependsOn, dependsOnID) {
+		if opts.dependsOnID != 0 && !containsInt(iss.Relations.DependsOn, opts.dependsOnID) {
 			continue
 		}
 		filtered = append(filtered, iss)
