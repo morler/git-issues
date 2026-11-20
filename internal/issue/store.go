@@ -1,6 +1,7 @@
 package issue
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -93,6 +94,11 @@ type BrokenFile struct {
 	Err  error
 }
 
+// ErrNotFound marks a lookup for an issue ID that has no file. LoadByID wraps
+// it in the user-facing message, so callers can tell a missing issue from a
+// read failure with errors.Is.
+var ErrNotFound = errors.New("not found")
+
 func LoadByID(issuesDir string, id int) (*Issue, error) {
 	issues, err := LoadAll(issuesDir)
 	if err != nil {
@@ -103,7 +109,7 @@ func LoadByID(issuesDir string, id int) (*Issue, error) {
 			return issue, nil
 		}
 	}
-	return nil, fmt.Errorf("issue #%d not found", id)
+	return nil, fmt.Errorf("issue #%d %w", id, ErrNotFound)
 }
 
 func Save(issuesDir string, issue *Issue) error {

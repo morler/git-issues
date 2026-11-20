@@ -1,6 +1,7 @@
 package issue
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -122,7 +123,27 @@ func TestLoadByIDNotFound(t *testing.T) {
 
 	_, err := LoadByID(dir, 99)
 	if err == nil {
-		t.Error("expected error for non-existent ID")
+		t.Fatal("expected error for non-existent ID")
+	}
+	if !errors.Is(err, ErrNotFound) {
+		t.Errorf("error %v does not wrap ErrNotFound", err)
+	}
+	if want := "issue #99 not found"; err.Error() != want {
+		t.Errorf("error = %q, want %q", err, want)
+	}
+}
+
+func TestLoadByIDReadFailureIsNotNotFound(t *testing.T) {
+	// The directory itself is missing, so this is an I/O failure, not a
+	// missing issue.
+	dir := filepath.Join(t.TempDir(), ".issues")
+
+	_, err := LoadByID(dir, 1)
+	if err == nil {
+		t.Fatal("expected error for unreadable issues directory")
+	}
+	if errors.Is(err, ErrNotFound) {
+		t.Errorf("error %v is reported as a missing issue", err)
 	}
 }
 

@@ -51,11 +51,10 @@ type checkReport struct {
 	errors   []string
 	warnings []string
 	fixed    []string
-	dirty    map[int]bool // issue IDs modified by --fix
 }
 
 func newCheckReport() *checkReport {
-	return &checkReport{dirty: make(map[int]bool)}
+	return &checkReport{}
 }
 
 func (r *checkReport) errorf(format string, args ...any) {
@@ -70,12 +69,20 @@ func (r *checkReport) fixedf(format string, args ...any) {
 	r.fixed = append(r.fixed, fmt.Sprintf(format, args...))
 }
 
+// pendingFix is a relation repair applied in memory that still has to be
+// written back. It is reported as fixed only after issue.Save succeeds.
+type pendingFix struct {
+	issue *issue.Issue
+	msg   string
+}
+
 // checkContext is the shared state of one run.
 type checkContext struct {
 	issues    []*issue.Issue
 	byID      map[int]*issue.Issue // first occurrence wins on duplicate IDs
 	brokenIDs map[int]bool         // IDs whose files cannot be parsed
 	autoFix   bool
+	pending   []pendingFix
 	report    *checkReport
 }
 
@@ -171,8 +178,10 @@ func (c *checkContext) checkOrphans(iss *issue.Issue) {
 			c.report.errorf("#%d: %s references non-existent #%d", iss.ID, relation, refID)
 			if c.autoFix {
 				issue.RemoveFromSlice(iss, relation, refID)
-				c.report.fixedf("#%d: removed orphan %s reference to #%d", iss.ID, relation, refID)
-				c.report.dirty[iss.ID] = true
+				c.pending = append(c.pending, pendingFix{
+					issue: iss,
+					msg:   fmt.Sprintf("#%d: removed orphan %s reference to #%d", iss.ID, relation, refID),
+				})
 			}
 		}
 	}
@@ -194,8 +203,10 @@ func (c *checkContext) checkSymmetry(iss *issue.Issue) {
 				iss.ID, relation, refID, refID, inverse, iss.ID)
 			if c.autoFix {
 				issue.AddToSlice(target, inverse, iss.ID)
-				c.report.fixedf("#%d: added missing %s #%d", refID, inverse, iss.ID)
-				c.report.dirty[target.ID] = true
+				c.pending = append(c.pending, pendingFix{
+					issue: target,
+					msg:   fmt.Sprintf("#%d: added missing %s #%d", refID, inverse, iss.ID),
+				})
 			}
 		}
 	}
@@ -210,9 +221,10 @@ func (c *checkContext) checkStatus(iss *issue.Issue) {
 	}
 }
 
-// saveFixes writes back the issues touched by --fix and stages them.
+// saveFixes writes back the issues touched by --fix and stages them. A fix is
+// reported as fixed only after its file was written successfully.
 func (c *checkContext) saveFixes(issuesDir string) error {
-	if !c.autoFix || len(c.report.dirty) == 0 {
+	if !c.autoFix || len(c.pending) == 0 {
 		return nil
 	}
 
@@ -221,13 +233,24 @@ func (c *checkContext) saveFixes(issuesDir string) error {
 		return err
 	}
 
+	// Group by file path: one issue can collect several fixes, and keying by ID
+	// would rewrite the second file of a duplicate ID that was never touched.
+	pendingByPath := make(map[string][]string, len(c.pending))
+	for _, fix := range c.pending {
+		pendingByPath[fix.issue.FilePath] = append(pendingByPath[fix.issue.FilePath], fix.msg)
+	}
+
 	for _, iss := range c.issues {
-		if !c.report.dirty[iss.ID] {
+		msgs := pendingByPath[iss.FilePath]
+		if len(msgs) == 0 {
 			continue
 		}
 		if err := issue.Save(issuesDir, iss); err != nil {
 			c.report.errorf("#%d: failed to save fix: %v", iss.ID, err)
 			continue
+		}
+		for _, msg := range msgs {
+			c.report.fixedf("%s", msg)
 		}
 		if cfg.AutoStage {
 			_ = git.Stage(issuesDir, iss.FilePath)

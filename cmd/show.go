@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"strings"
 
@@ -32,7 +33,12 @@ var showCmd = &cobra.Command{
 
 		iss, err := issue.LoadByID(issuesDir, id)
 		if err != nil {
-			return fmt.Errorf("issue #%d not found", id)
+			// LoadByID words a missing issue as "issue #N not found" already;
+			// anything else is a real read failure and must not be disguised.
+			if errors.Is(err, issue.ErrNotFound) {
+				return err
+			}
+			return fmt.Errorf("load issue #%d: %w", id, err)
 		}
 
 		format, _ := cmd.Flags().GetString("format")

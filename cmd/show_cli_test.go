@@ -252,6 +252,26 @@ func TestShowCommandNoRepo(t *testing.T) {
 	wantContains(t, "error", err.Error(), "no .issues/ directory found")
 }
 
+func TestShowCommandReportsLoadFailure(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("permission checks do not apply to root")
+	}
+
+	repo := newCLIRepo(t)
+	repo.seed(t, &issue.Issue{ID: 1, Title: "Existing"})
+	if err := os.Chmod(repo.issuesDir, 0o111); err != nil {
+		t.Fatalf("chmod .issues: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(repo.issuesDir, 0o755) })
+
+	_, _, err := repo.run(t, "show", "1")
+	if err == nil {
+		t.Fatal("expected show to fail on an unreadable .issues/")
+	}
+	wantContains(t, "error", err.Error(), "permission denied")
+	wantNotContains(t, "error", err.Error(), "not found")
+}
+
 func TestShowCommandRequiresArgument(t *testing.T) {
 	repo := newCLIRepo(t)
 
