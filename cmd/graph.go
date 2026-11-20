@@ -44,9 +44,9 @@ var graphCmd = &cobra.Command{
 
 		if rootID != 0 {
 			// Show subgraph from root
-			visited := make(map[int]bool)
+			path := make(map[int]bool)
 			printed := make(map[int]bool)
-			printNode(os.Stdout, issueMap, rootID, "", visited, printed)
+			printNode(os.Stdout, issueMap, rootID, "", path, printed)
 			return nil
 		}
 
@@ -69,8 +69,7 @@ var graphCmd = &cobra.Command{
 			if blockedIDs[iss.ID] || globalPrinted[iss.ID] {
 				continue
 			}
-			visited := make(map[int]bool)
-			printNode(os.Stdout, issueMap, iss.ID, "", visited, globalPrinted)
+			printNode(os.Stdout, issueMap, iss.ID, "", make(map[int]bool), globalPrinted)
 			fmt.Println()
 		}
 
@@ -82,8 +81,7 @@ var graphCmd = &cobra.Command{
 			if globalPrinted[iss.ID] {
 				continue
 			}
-			visited := make(map[int]bool)
-			printNode(os.Stdout, issueMap, iss.ID, "", visited, globalPrinted)
+			printNode(os.Stdout, issueMap, iss.ID, "", make(map[int]bool), globalPrinted)
 			fmt.Println()
 		}
 
@@ -91,18 +89,29 @@ var graphCmd = &cobra.Command{
 	},
 }
 
-func printNode(w io.Writer, issueMap map[int]*issue.Issue, id int, indent string, visited map[int]bool, globalPrinted map[int]bool) {
+// printNode renders id and its blocks subtree. path holds the nodes on the
+// current descent, so a repeated node on that path is a real cycle; printed
+// holds nodes already rendered anywhere, so a second path to the same node
+// (for example in a diamond DAG) is marked as already shown instead of being
+// reported as a cycle.
+func printNode(w io.Writer, issueMap map[int]*issue.Issue, id int, indent string, path map[int]bool, printed map[int]bool) {
 	iss, ok := issueMap[id]
 	if !ok {
 		return
 	}
 
-	if visited[id] {
+	if path[id] {
 		_, _ = fmt.Fprintf(w, "%sWarning: cycle detected at #%d, truncating\n", indent, id)
 		return
 	}
-	visited[id] = true
-	globalPrinted[id] = true
+	if printed[id] {
+		_, _ = fmt.Fprintf(w, "%s#%d  (already shown)\n", indent, id)
+		return
+	}
+
+	path[id] = true
+	printed[id] = true
+	defer delete(path, id)
 
 	_, _ = fmt.Fprintf(w, "%s#%d  %s [%s, %s]\n", indent, iss.ID, iss.Title, iss.Status, iss.Priority)
 
@@ -117,7 +126,7 @@ func printNode(w io.Writer, issueMap map[int]*issue.Issue, id int, indent string
 	if len(blocksInSet) > 0 {
 		_, _ = fmt.Fprintf(w, "%s└── blocks:\n", indent)
 		for _, bid := range blocksInSet {
-			printNode(w, issueMap, bid, indent+"    ", visited, globalPrinted)
+			printNode(w, issueMap, bid, indent+"    ", path, printed)
 		}
 	} else if indent == "" {
 		_, _ = fmt.Fprintf(w, "%s    (no relations)\n", indent)

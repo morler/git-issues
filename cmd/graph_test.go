@@ -24,6 +24,29 @@ func TestPrintNodeCycle(t *testing.T) {
 	}
 }
 
+func TestPrintNodeDiamondDAG(t *testing.T) {
+	// #1 blocks #2 and #3; #2 and #3 both block #4.
+	a := testIssue(1, "open", "high", nil, []int{2, 3}, nil)
+	b := testIssue(2, "open", "medium", nil, []int{4}, nil)
+	c := testIssue(3, "open", "medium", nil, []int{4}, nil)
+	d := testIssue(4, "open", "low", nil, nil, nil)
+	issues := map[int]*issue.Issue{1: a, 2: b, 3: c, 4: d}
+
+	var buf bytes.Buffer
+	printNode(&buf, issues, 1, "", map[int]bool{}, map[int]bool{})
+
+	out := buf.String()
+	if strings.Contains(out, "cycle detected") {
+		t.Errorf("diamond DAG reported a cycle:\n%s", out)
+	}
+	if got := strings.Count(out, "#4  Issue"); got != 1 {
+		t.Errorf("#4 printed %d times, want once:\n%s", got, out)
+	}
+	if !strings.Contains(out, "#4  (already shown)") {
+		t.Errorf("second path to #4 is not marked as already shown:\n%s", out)
+	}
+}
+
 func TestPrintNodeChain(t *testing.T) {
 	a := testIssue(1, "open", "high", nil, []int{2}, nil)
 	b := testIssue(2, "open", "medium", nil, []int{3}, nil)

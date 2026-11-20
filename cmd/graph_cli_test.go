@@ -155,6 +155,30 @@ func TestGraphCLIRootOpenOnlyHidesClosedRoot(t *testing.T) {
 	}
 }
 
+func TestGraphCLIDiamondDAG(t *testing.T) {
+	repo := newCLIRepo(t)
+	repo.seed(t, &issue.Issue{ID: 1, Title: "Root", Relations: issue.Relations{Blocks: []int{2, 3}}})
+	repo.seed(t, &issue.Issue{ID: 2, Title: "Left", Relations: issue.Relations{Blocks: []int{4}, DependsOn: []int{1}}})
+	repo.seed(t, &issue.Issue{ID: 3, Title: "Right", Relations: issue.Relations{Blocks: []int{4}, DependsOn: []int{1}}})
+	repo.seed(t, &issue.Issue{ID: 4, Title: "Leaf", Relations: issue.Relations{DependsOn: []int{2, 3}}})
+
+	stdout, stderr, err := repo.run(t, "graph")
+	if err != nil {
+		t.Fatalf("graph failed: %v", err)
+	}
+	if stderr != "" {
+		t.Errorf("unexpected stderr: %s", stderr)
+	}
+	wantNotContains(t, "stdout", stdout, "cycle detected")
+	wantContains(t, "stdout", stdout, "#1  Root")
+	wantContains(t, "stdout", stdout, "#2  Left")
+	wantContains(t, "stdout", stdout, "#3  Right")
+	if got := strings.Count(stdout, "#4  Leaf"); got != 1 {
+		t.Errorf("#4 printed %d times, want once:\n%s", got, stdout)
+	}
+	wantContains(t, "stdout", stdout, "#4  (already shown)")
+}
+
 func TestGraphCLICycleTruncated(t *testing.T) {
 	repo := newCLIRepo(t)
 	repo.seed(t, &issue.Issue{

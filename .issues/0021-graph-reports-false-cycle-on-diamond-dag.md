@@ -1,12 +1,13 @@
 ---
 id: 21
 title: graph reports false cycle on diamond DAG
-status: open
+status: closed
 priority: high
 labels:
     - bug
 created: "2026-11-19"
-updated: "2026-11-19"
+updated: "2026-11-20"
+closed: "2026-11-20"
 ---
 
 Repro: #1 blocks #2 and #3; #2 and #3 each block #4.
