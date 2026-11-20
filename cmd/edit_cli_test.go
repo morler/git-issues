@@ -222,6 +222,81 @@ func TestEditRejectsInvalidFrontmatter(t *testing.T) {
 	}
 }
 
+func TestEditRejectsChangedID(t *testing.T) {
+	repo := newCLIRepo(t)
+	orig := repo.seed(t, &issue.Issue{ID: 1, Title: "Keep me"})
+	repo.seed(t, &issue.Issue{ID: 2, Title: "Untouched target"})
+	before := readFile(t, orig.FilePath)
+
+	content := editTestContent(t, orig.FilePath, func(iss *issue.Issue) {
+		iss.ID = 5
+		iss.Updated = "2020-01-01"
+		iss.Relations.Blocks = []int{2}
+	})
+	editTestEditor(t, content)
+
+	stdout, _, err := repo.run(t, "edit", "1")
+	if err == nil {
+		t.Fatal("edit accepted a changed id")
+	}
+	wantContains(t, "error", err.Error(), "issue id changed from #1 to #5")
+	wantContains(t, "error", err.Error(), "original file restored")
+	wantNotContains(t, "stdout", stdout, "Updated:")
+
+	// The pre-edit content is restored, so #1 stays addressable and neither Save
+	// nor relation sync ran with the changed id.
+	if got := readFile(t, orig.FilePath); got != before {
+		t.Errorf("file was not restored:\nwant:\n%s\ngot:\n%s", before, got)
+	}
+	if got := repo.load(t, 1).Title; got != "Keep me" {
+		t.Errorf("#1 title = %q, want %q", got, "Keep me")
+	}
+	if got := repo.load(t, 2).Relations.DependsOn; len(got) != 0 {
+		t.Errorf("#2 depends-on = %v, want empty (relations must not sync on failed edit)", got)
+	}
+	matches, err := filepath.Glob(filepath.Join(repo.issuesDir, "*.md"))
+	if err != nil {
+		t.Fatalf("glob issue files: %v", err)
+	}
+	if len(matches) != 2 {
+		t.Errorf("issue files = %v, want no file created for the new id", matches)
+	}
+}
+
+func TestEditRejectsFilenameIDMismatch(t *testing.T) {
+	tests := []struct {
+		name     string
+		filename string
+		want     string
+	}{
+		{"prefixed mismatch", "0002-legacy.md", "filename 0002-legacy.md does not match issue #1"},
+		{"no id prefix", "legacy.md", "filename \"legacy.md\" does not start with an issue ID"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := newCLIRepo(t)
+			iss := &issue.Issue{
+				ID: 1, Title: "Legacy", Status: "open", Priority: "medium",
+				Labels: []string{}, Created: "2026-01-01", Updated: "2026-01-01",
+			}
+			path := filepath.Join(repo.issuesDir, tt.filename)
+			content := string(issue.Marshal(iss))
+			if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+				t.Fatalf("write %s: %v", tt.filename, err)
+			}
+			editTestEditor(t, content)
+
+			stdout, _, err := repo.run(t, "edit", "1")
+			if err == nil {
+				t.Fatalf("edit accepted filename %s for issue #1", tt.filename)
+			}
+			wantContains(t, "error", err.Error(), tt.want)
+			wantNotContains(t, "stdout", stdout, "Updated:")
+		})
+	}
+}
+
 func TestEditEditorFailureLeavesFileUntouched(t *testing.T) {
 	repo := newCLIRepo(t)
 	orig := repo.seed(t, &issue.Issue{ID: 1, Title: "Untouched"})

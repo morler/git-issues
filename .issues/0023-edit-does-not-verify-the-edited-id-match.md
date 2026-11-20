@@ -1,12 +1,13 @@
 ---
 id: 23
 title: edit does not verify the edited id matches the target
-status: open
+status: closed
 priority: high
 labels:
     - bug
 created: "2026-11-19"
-updated: "2026-11-19"
+updated: "2026-11-20"
+closed: "2026-11-20"
 ---
 
 Repro: `issues edit 1`, change the frontmatter to `id: 5`, save.

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 
 	"github.com/steviee/git-issues/internal/config"
 	"github.com/steviee/git-issues/internal/git"
@@ -43,6 +44,10 @@ var editCmd = &cobra.Command{
 
 		// Snapshot old relations for diff (will be used in Phase 5)
 		oldRelations := iss.Relations
+		original, err := os.ReadFile(iss.FilePath)
+		if err != nil {
+			return err
+		}
 
 		editor := os.Getenv("EDITOR")
 		if editor == "" {
@@ -65,6 +70,26 @@ var editCmd = &cobra.Command{
 
 		if err := issue.Validate(edited); err != nil {
 			return fmt.Errorf("%w", err)
+		}
+
+		// IDs are immutable and the filename encodes the ID, so a changed ID
+		// would desynchronize LoadByID, NextID and the file name.
+		if edited.ID != id {
+			message := fmt.Sprintf("issue id changed from #%d to #%d; IDs are immutable", id, edited.ID)
+			if err := os.WriteFile(iss.FilePath, original, 0o644); err != nil {
+				return fmt.Errorf("%s; restoring the original file failed: %w", message, err)
+			}
+			// Restore the pre-edit content so the issue stays addressable; without
+			// this the file would carry a new id and `issues show` could not find it.
+			return fmt.Errorf("%s; original file restored", message)
+		}
+		name := filepath.Base(edited.FilePath)
+		fileID, ok := issue.IDFromFilename(name)
+		if !ok {
+			return fmt.Errorf("filename %q does not start with an issue ID", name)
+		}
+		if fileID != id {
+			return fmt.Errorf("filename %s does not match issue #%d", name, id)
 		}
 
 		// Save (updates `updated` field)
