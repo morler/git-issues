@@ -114,8 +114,9 @@ func TestSetCLILabelRemove(t *testing.T) {
 	repo := newCLIRepo(t)
 	repo.seed(t, &issue.Issue{ID: 1, Title: "Fix login", Labels: []string{"bug", "auth"}})
 
-	// A leading dash needs the "--" terminator, otherwise cobra reads it as a flag.
-	stdout, stderr, err := repo.run(t, "set", "1", "label", "--", "-bug")
+	// The documented form without a terminator: set stops flag parsing at the
+	// first argument, so -bug reaches RunE as a value.
+	stdout, stderr, err := repo.run(t, "set", "1", "label", "-bug")
 	if err != nil {
 		t.Fatalf("remove label: %v (stderr: %s)", err, stderr)
 	}
@@ -124,14 +125,17 @@ func TestSetCLILabelRemove(t *testing.T) {
 		t.Errorf("labels on disk = %v, want %v", got, want)
 	}
 
-	if _, _, err := repo.run(t, "set", "1", "label", "--", "-auth"); err != nil {
-		t.Fatalf("remove last label: %v", err)
+	// The "--" terminator keeps working as well.
+	stdout, stderr, err = repo.run(t, "set", "1", "label", "--", "-auth")
+	if err != nil {
+		t.Fatalf("remove last label with --: %v (stderr: %s)", err, stderr)
 	}
+	wantContains(t, "stdout", stdout, "Updated #1: label = -auth")
 	if got := repo.load(t, 1).Labels; len(got) != 0 {
 		t.Errorf("labels after removing last = %v, want empty", got)
 	}
 
-	if _, _, err := repo.run(t, "set", "1", "label", "--", "-missing"); err != nil {
+	if _, _, err := repo.run(t, "set", "1", "label", "-missing"); err != nil {
 		t.Fatalf("remove unknown label: %v", err)
 	}
 	if got := repo.load(t, 1).Labels; len(got) != 0 {

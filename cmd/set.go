@@ -12,14 +12,24 @@ import (
 )
 
 func init() {
+	// set takes no flags of its own, and stopping flag parsing at the first
+	// argument lets the documented `issues set 7 label -bug` form work instead
+	// of cobra rejecting -bug as an unknown shorthand.
+	setCmd.Flags().SetInterspersed(false)
 	rootCmd.AddCommand(setCmd)
 }
 
 var setCmd = &cobra.Command{
 	Use:   "set <id> <field> <value>",
 	Short: "Set a field on an issue",
-	Args:  cobra.ExactArgs(3),
+	Args: func(_ *cobra.Command, args []string) error {
+		if n := len(setArgs(args)); n != 3 {
+			return fmt.Errorf("accepts 3 arg(s), received %d", n)
+		}
+		return nil
+	},
 	RunE: func(cmd *cobra.Command, args []string) error {
+		args = setArgs(args)
 		id, err := parseID(args[0])
 		if err != nil {
 			return err
@@ -93,6 +103,19 @@ var setCmd = &cobra.Command{
 		fmt.Printf("Updated #%d: %s = %s\n", id, field, value)
 		return nil
 	},
+}
+
+// setArgs removes a literal "--" from the arguments. Flag parsing stops at the
+// first positional argument, so the terminator is not consumed by cobra and
+// both `label -bug` and `label -- -bug` reach RunE as three values.
+func setArgs(args []string) []string {
+	kept := make([]string, 0, len(args))
+	for _, arg := range args {
+		if arg != "--" {
+			kept = append(kept, arg)
+		}
+	}
+	return kept
 }
 
 func contains(slice []string, val string) bool {

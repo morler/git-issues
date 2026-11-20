@@ -1,12 +1,13 @@
 ---
 id: 26
 title: label removal cannot be typed as documented
-status: open
+status: closed
 priority: medium
 labels:
     - bug
 created: "2026-11-19"
-updated: "2026-11-19"
+updated: "2026-11-20"
+closed: "2026-11-20"
 ---
 
 CLAUDE.md, .agent.md, SKILL.md and README document `issues set 7 label -bug`, but cobra parses `-bug` as a flag:

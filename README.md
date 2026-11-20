@@ -128,6 +128,8 @@ Designed for AI agent workflows with machine-readable output:
 | `issues batch close [--label L] [--status S] [--force]` | Close all matching issues |
 | `issues batch set <field> <value> [--label L] [--status S]` | Set field on all matching issues |
 
+In batch calls, put `--` before a value that starts with a dash, otherwise it is parsed as a flag: `issues batch set -- label -bug`. `issues set 7 label -bug` works without it.
+
 ### Other
 
 | Command | Description |
