@@ -644,7 +644,15 @@ test:
     go test ./...
 
 fmt-check:
-    @unformatted=$$(gofmt -l $$(git ls-files '*.go')); \
+    @list() { \
+        git ls-files --cached --others --exclude-standard -z '*.go' 2>/dev/null || \
+        find . -name '*.go' -print0; \
+    }; \
+    if [ "$$(list | wc -c)" -eq 0 ]; then \
+        echo "No Go files to check."; \
+        exit 0; \
+    fi; \
+    unformatted=$$(list | xargs -0 gofmt -l) || { echo "gofmt failed"; exit 1; }; \
     if [ -n "$$unformatted" ]; then \
         echo "Unformatted files:"; \
         echo "$$unformatted"; \

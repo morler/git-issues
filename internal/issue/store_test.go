@@ -253,16 +253,19 @@ func TestLoadAllWarnsOnBrokenFiles(t *testing.T) {
 	}
 }
 
-func TestBrokenFilesReturnsUnparsableFiles(t *testing.T) {
+func TestLoadWithBrokenReturnsUnparsableFiles(t *testing.T) {
 	dir := t.TempDir()
 	writeIssueFile(t, dir, 1, "Valid issue")
 	if err := os.WriteFile(filepath.Join(dir, "0002-broken.md"), []byte("garbage\n"), 0o644); err != nil {
 		t.Fatalf("write broken file: %v", err)
 	}
 
-	broken, err := BrokenFiles(dir)
+	issues, broken, err := LoadWithBroken(dir)
 	if err != nil {
-		t.Fatalf("BrokenFiles: %v", err)
+		t.Fatalf("LoadWithBroken: %v", err)
+	}
+	if len(issues) != 1 || issues[0].ID != 1 {
+		t.Errorf("issues = %v, want only #1", issues)
 	}
 	if len(broken) != 1 {
 		t.Fatalf("broken = %v, want one file", broken)

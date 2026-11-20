@@ -89,9 +89,15 @@ func (m *Model) populateColumns(issues []*issue.Issue) {
 	}
 }
 
-// Init implements tea.Model.
+// Init implements tea.Model. The watcher is created in the returned command
+// and stored by the watcherMsg handler, because Init's value receiver cannot
+// persist fields on the model that bubbletea keeps.
 func (m Model) Init() tea.Cmd {
-	return m.watchFiles()
+	w, wait := openWatcher(m.issuesDir)
+	if w == nil {
+		return nil
+	}
+	return func() tea.Msg { return watcherMsg{watcher: w, wait: wait} }
 }
 
 // Update implements tea.Model.
@@ -108,6 +114,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case reloadMsg:
 		return m.reload()
+
+	case watcherMsg:
+		m.watcher = msg.watcher
+		return m, msg.wait
 
 	case tea.KeyMsg:
 		return m.handleKey(msg)
@@ -131,11 +141,14 @@ func (m Model) resize(msg tea.WindowSizeMsg) Model {
 // reload re-reads the issues directory and restarts the file watcher.
 func (m Model) reload() (tea.Model, tea.Cmd) {
 	issues, err := issue.LoadAll(m.issuesDir)
-	if err == nil {
+	if err != nil {
+		m.err = err
+	} else {
 		m.populateColumns(m.applyFilters(issues))
 	}
 	m.stopWatcher()
-	return m, m.watchFiles()
+	cmd := m.watchFiles()
+	return m, cmd
 }
 
 // applyFilters keeps only the issues accepted by every configured predicate.
@@ -251,7 +264,7 @@ func (m *Model) moveIssue(direction int) tea.Cmd {
 	return func() tea.Msg {
 		err := issue.Save(issuesDir, iss)
 		if err == nil && autoStage {
-			_ = git.Stage(filePath)
+			_ = git.Stage(issuesDir, filePath)
 		}
 		return savedMsg{err: err}
 	}

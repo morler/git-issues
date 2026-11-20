@@ -107,7 +107,7 @@ var newCmd = &cobra.Command{
 		}
 
 		if cfg.AutoStage {
-			_ = git.Stage(iss.FilePath)
+			_ = git.Stage(issuesDir, iss.FilePath)
 		}
 
 		// Sync relations bidirectionally

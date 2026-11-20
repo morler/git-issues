@@ -78,7 +78,7 @@ var closeCmd = &cobra.Command{
 		}
 
 		if cfg.AutoStage {
-			_ = git.Stage(iss.FilePath)
+			_ = git.Stage(issuesDir, iss.FilePath)
 		}
 
 		fmt.Printf("Closed: #%d\n", id)
@@ -129,6 +129,25 @@ func openBlockers(issuesDir string, iss *issue.Issue) []string {
 	for _, depID := range iss.Relations.DependsOn {
 		dep, err := issue.LoadByID(issuesDir, depID)
 		if err != nil {
+			continue
+		}
+		if dep.Status == "open" || dep.Status == "in-progress" {
+			blockers = append(blockers, fmt.Sprintf("#%d (%s)", dep.ID, dep.Title))
+		}
+	}
+	return blockers
+}
+
+// openBlockersFrom lists the open dependencies of iss from the already loaded
+// issues. IDs in alsoClosing are skipped because the same batch closes them.
+func openBlockersFrom(byID map[int]*issue.Issue, iss *issue.Issue, alsoClosing map[int]bool) []string {
+	var blockers []string
+	for _, depID := range iss.Relations.DependsOn {
+		if alsoClosing[depID] {
+			continue
+		}
+		dep, ok := byID[depID]
+		if !ok {
 			continue
 		}
 		if dep.Status == "open" || dep.Status == "in-progress" {

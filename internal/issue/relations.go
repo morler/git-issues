@@ -46,8 +46,8 @@ func AddRelation(issuesDir string, sourceID int, relation string, targetID int, 
 	}
 
 	if cfg.AutoStage {
-		_ = git.Stage(source.FilePath)
-		_ = git.Stage(target.FilePath)
+		_ = git.Stage(issuesDir, source.FilePath)
+		_ = git.Stage(issuesDir, target.FilePath)
 	}
 
 	return nil
@@ -75,8 +75,8 @@ func RemoveRelation(issuesDir string, sourceID int, relation string, targetID in
 	}
 
 	if cfg.AutoStage {
-		_ = git.Stage(source.FilePath)
-		_ = git.Stage(target.FilePath)
+		_ = git.Stage(issuesDir, source.FilePath)
+		_ = git.Stage(issuesDir, target.FilePath)
 	}
 
 	return nil

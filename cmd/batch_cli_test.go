@@ -216,7 +216,8 @@ func TestBatchCloseNoMatches(t *testing.T) {
 
 func TestBatchCloseRefusesOpenBlockers(t *testing.T) {
 	repo := newCLIRepo(t)
-	repo.seed(t, &issue.Issue{ID: 1, Title: "Root", Status: "open"})
+	// The blocker is in-progress, so the default open-only batch does not close it.
+	repo.seed(t, &issue.Issue{ID: 1, Title: "Root", Status: "in-progress"})
 	repo.seed(t, &issue.Issue{
 		ID: 2, Title: "Blocked", Status: "open",
 		Relations: issue.Relations{DependsOn: []int{1}},
@@ -236,7 +237,7 @@ func TestBatchCloseRefusesOpenBlockers(t *testing.T) {
 
 func TestBatchCloseForceWithOpenBlockers(t *testing.T) {
 	repo := newCLIRepo(t)
-	repo.seed(t, &issue.Issue{ID: 1, Title: "Root", Status: "open"})
+	repo.seed(t, &issue.Issue{ID: 1, Title: "Root", Status: "in-progress"})
 	repo.seed(t, &issue.Issue{
 		ID: 2, Title: "Blocked", Status: "open",
 		Relations: issue.Relations{DependsOn: []int{1}},
@@ -247,8 +248,31 @@ func TestBatchCloseForceWithOpenBlockers(t *testing.T) {
 	if err != nil {
 		t.Fatalf("batch close --force: %v", err)
 	}
-	wantContains(t, "stdout", stdout, "\n3 issues closed.\n")
-	for id := 1; id <= 3; id++ {
+	wantContains(t, "stdout", stdout, "\n2 issues closed.\n")
+	for _, id := range []int{2, 3} {
+		if got := repo.load(t, id).Status; got != "closed" {
+			t.Errorf("#%d status = %q, want closed", id, got)
+		}
+	}
+	if got := repo.load(t, 1).Status; got != "in-progress" {
+		t.Errorf("#1 status = %q, want in-progress", got)
+	}
+}
+
+func TestBatchCloseClosesSelectedBlockers(t *testing.T) {
+	repo := newCLIRepo(t)
+	repo.seed(t, &issue.Issue{ID: 1, Title: "Root", Status: "open"})
+	repo.seed(t, &issue.Issue{
+		ID: 2, Title: "Blocked", Status: "open",
+		Relations: issue.Relations{DependsOn: []int{1}},
+	})
+
+	stdout, _, err := repo.run(t, "batch", "close")
+	if err != nil {
+		t.Fatalf("batch close with both sides selected: %v", err)
+	}
+	wantContains(t, "stdout", stdout, "\n2 issues closed.\n")
+	for _, id := range []int{1, 2} {
 		if got := repo.load(t, id).Status; got != "closed" {
 			t.Errorf("#%d status = %q, want closed", id, got)
 		}

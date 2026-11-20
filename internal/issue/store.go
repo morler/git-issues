@@ -29,15 +29,25 @@ func IssuesDir() (string, error) {
 }
 
 func LoadAll(issuesDir string) ([]*Issue, error) {
-	scan, err := scanIssues(issuesDir)
+	issues, broken, err := LoadWithBroken(issuesDir)
 	if err != nil {
 		return nil, err
 	}
 
-	for _, bf := range scan.broken {
+	for _, bf := range broken {
 		fmt.Fprintf(os.Stderr, "Warning: skipping issue file %s: %v\n", filepath.Base(bf.Path), bf.Err)
 	}
-	return scan.issues, nil
+	return issues, nil
+}
+
+// LoadWithBroken returns the parsed issues and the unparsable files of
+// issuesDir from a single directory pass, without printing warnings.
+func LoadWithBroken(issuesDir string) ([]*Issue, []BrokenFile, error) {
+	scan, err := scanIssues(issuesDir)
+	if err != nil {
+		return nil, nil, err
+	}
+	return scan.issues, scan.broken, nil
 }
 
 // issueScan is the result of reading the issues directory once.
@@ -81,15 +91,6 @@ func scanIssues(issuesDir string) (issueScan, error) {
 type BrokenFile struct {
 	Path string
 	Err  error
-}
-
-// BrokenFiles returns issue files that LoadAll would silently skip.
-func BrokenFiles(issuesDir string) ([]BrokenFile, error) {
-	scan, err := scanIssues(issuesDir)
-	if err != nil {
-		return nil, err
-	}
-	return scan.broken, nil
 }
 
 func LoadByID(issuesDir string, id int) (*Issue, error) {

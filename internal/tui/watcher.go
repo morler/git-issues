@@ -7,21 +7,36 @@ import (
 	"github.com/fsnotify/fsnotify"
 )
 
-// watchFiles starts an fsnotify watcher on the issues directory.
-func (m *Model) watchFiles() tea.Cmd {
-	if m.issuesDir == "" {
-		return nil
+// watcherMsg carries a watcher created in Init back into the model, which Init
+// cannot store itself because it runs on a value copy.
+type watcherMsg struct {
+	watcher *fsnotify.Watcher
+	wait    tea.Cmd
+}
+
+// openWatcher starts watching issuesDir and returns the watcher plus the
+// command that waits for the next change.
+func openWatcher(issuesDir string) (*fsnotify.Watcher, tea.Cmd) {
+	if issuesDir == "" {
+		return nil, nil
 	}
 	w, err := fsnotify.NewWatcher()
 	if err != nil {
-		return nil
+		return nil, nil
 	}
-	if err := w.Add(m.issuesDir); err != nil {
+	if err := w.Add(issuesDir); err != nil {
 		_ = w.Close()
-		return nil
+		return nil, nil
 	}
+	return w, waitForChange(w)
+}
+
+// watchFiles starts an fsnotify watcher on the issues directory and stores it
+// on the model. Callers must keep the returned model so the field is retained.
+func (m *Model) watchFiles() tea.Cmd {
+	w, cmd := openWatcher(m.issuesDir)
 	m.watcher = w
-	return waitForChange(w)
+	return cmd
 }
 
 // waitForChange waits for a relevant filesystem event and debounces the burst

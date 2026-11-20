@@ -97,7 +97,7 @@ var setCmd = &cobra.Command{
 		}
 
 		if cfg.AutoStage {
-			_ = git.Stage(iss.FilePath)
+			_ = git.Stage(issuesDir, iss.FilePath)
 		}
 
 		fmt.Printf("Updated #%d: %s = %s\n", id, field, value)

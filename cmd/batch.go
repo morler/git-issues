@@ -66,12 +66,22 @@ var batchCloseCmd = &cobra.Command{
 			selected = append(selected, iss)
 		}
 
-		// Refuse the whole batch while any selected issue has open blockers, so
-		// a bulk close cannot bypass the guard `issues close` and `issues done` use.
+		// Refuse the whole batch while any selected issue has open blockers that
+		// this batch does not close itself, so a bulk close cannot bypass the
+		// guard `issues close` and `issues done` use.
 		if !force {
+			byID := make(map[int]*issue.Issue, len(issues))
+			for _, iss := range issues {
+				byID[iss.ID] = iss
+			}
+			selectedIDs := make(map[int]bool, len(selected))
+			for _, iss := range selected {
+				selectedIDs[iss.ID] = true
+			}
+
 			var blocked []string
 			for _, iss := range selected {
-				blockers := openBlockers(issuesDir, iss)
+				blockers := openBlockersFrom(byID, iss, selectedIDs)
 				if len(blockers) == 0 {
 					continue
 				}
@@ -99,7 +109,7 @@ var batchCloseCmd = &cobra.Command{
 				continue
 			}
 			if cfg.AutoStage {
-				_ = git.Stage(iss.FilePath)
+				_ = git.Stage(issuesDir, iss.FilePath)
 			}
 			count++
 			fmt.Printf("Closed: #%d %s\n", iss.ID, iss.Title)
@@ -183,7 +193,7 @@ var batchSetCmd = &cobra.Command{
 				continue
 			}
 			if cfg.AutoStage {
-				_ = git.Stage(iss.FilePath)
+				_ = git.Stage(issuesDir, iss.FilePath)
 			}
 			count++
 			fmt.Printf("Updated #%d: %s = %s\n", iss.ID, field, value)

@@ -1,6 +1,7 @@
 package tui
 
 import (
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -304,6 +305,47 @@ func TestDetailViewMarkdownRendering(t *testing.T) {
 	if !strings.Contains(content, "Heading") {
 		t.Error("rendered body should contain heading text 'Heading'")
 	}
+}
+
+func TestInitWiresWatcher(t *testing.T) {
+	dir := t.TempDir()
+	m := NewModel(nil, dir, config.Default())
+
+	cmd := m.Init()
+	if cmd == nil {
+		t.Fatal("Init returned no command for a valid issues directory")
+	}
+	m = update(m, cmd())
+	if m.watcher == nil {
+		t.Fatal("watcher was not stored on the model")
+	}
+	m.stopWatcher()
+	if m.watcher != nil {
+		t.Error("stopWatcher did not clear the watcher")
+	}
+}
+
+func TestReloadRecordsLoadError(t *testing.T) {
+	m := NewModel(nil, filepath.Join(t.TempDir(), "missing"), config.Default())
+
+	updated, _ := m.reload()
+	if updated.(Model).err == nil {
+		t.Error("reload dropped the load error")
+	}
+}
+
+func TestReloadStoresWatcher(t *testing.T) {
+	m := NewModel(nil, t.TempDir(), config.Default())
+
+	updated, cmd := m.reload()
+	reloaded := updated.(Model)
+	if reloaded.watcher == nil {
+		t.Fatal("reload did not store the new watcher")
+	}
+	if cmd == nil {
+		t.Error("reload did not return the wait command")
+	}
+	reloaded.stopWatcher()
 }
 
 func TestColumnAddRemove(t *testing.T) {

@@ -47,7 +47,7 @@ var reopenCmd = &cobra.Command{
 		}
 
 		if cfg.AutoStage {
-			_ = git.Stage(iss.FilePath)
+			_ = git.Stage(issuesDir, iss.FilePath)
 		}
 
 		fmt.Printf("Reopened: #%d\n", id)

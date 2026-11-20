@@ -8,11 +8,11 @@ import (
 )
 
 // Stage stages an issue file with `git add`. Staging is best effort: a missing
-// git repository only produces a warning and never fails the calling command.
-// The path is resolved and must point at a file directly inside a .issues/
-// directory, so no caller input can stage arbitrary files.
-func Stage(filePath string) error {
-	abs, err := issueFilePath(filePath)
+// git repository only produces a warning. A path that does not resolve to a
+// direct child of issuesDir is rejected with an error and never passed to git;
+// callers currently discard that error, but the file is not touched.
+func Stage(issuesDir, filePath string) error {
+	abs, err := resolveIssueFile(issuesDir, filePath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: not staging %q: %v\n", filePath, err)
 		return err
@@ -27,23 +27,39 @@ func Stage(filePath string) error {
 	return nil
 }
 
-// issueFilePath makes filePath absolute, resolves symlinks and rejects
-// anything that is not a direct child of a .issues/ directory.
-func issueFilePath(filePath string) (string, error) {
+// resolveIssueFile resolves both paths and requires the file to be a direct
+// child of the issues directory. Both sides are resolved so a symlinked
+// .issues/ keeps working while look-alike directories are rejected. Resolution
+// failures are fatal for this guard: it must not fall back to an unchecked path.
+func resolveIssueFile(issuesDir, filePath string) (string, error) {
 	if filePath == "" {
 		return "", fmt.Errorf("empty path")
 	}
 
-	abs, err := filepath.Abs(filePath)
+	dir, err := resolveExisting(issuesDir)
+	if err != nil {
+		return "", fmt.Errorf("issues directory: %w", err)
+	}
+	abs, err := resolveExisting(filePath)
 	if err != nil {
 		return "", err
 	}
-	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
-		abs = resolved
-	}
-
-	if filepath.Base(filepath.Dir(abs)) != ".issues" {
-		return "", fmt.Errorf("path is outside .issues/")
+	if filepath.Dir(abs) != dir {
+		return "", fmt.Errorf("path is outside %s", issuesDir)
 	}
 	return abs, nil
+}
+
+// resolveExisting returns an absolute path with every symlink resolved. The
+// file must exist; there is intentionally no unresolved fallback.
+func resolveExisting(path string) (string, error) {
+	abs, err := filepath.Abs(path)
+	if err != nil {
+		return "", err
+	}
+	resolved, err := filepath.EvalSymlinks(abs)
+	if err != nil {
+		return "", err
+	}
+	return resolved, nil
 }

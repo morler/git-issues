@@ -51,7 +51,7 @@ var claimCmd = &cobra.Command{
 		}
 
 		if cfg.AutoStage {
-			_ = git.Stage(iss.FilePath)
+			_ = git.Stage(issuesDir, iss.FilePath)
 		}
 
 		fmt.Printf("Claimed: #%d %s\n", id, iss.Title)
@@ -102,7 +102,7 @@ var doneCmd = &cobra.Command{
 		}
 
 		if cfg.AutoStage {
-			_ = git.Stage(iss.FilePath)
+			_ = git.Stage(issuesDir, iss.FilePath)
 		}
 
 		fmt.Printf("Done: #%d %s\n", id, iss.Title)

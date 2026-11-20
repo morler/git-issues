@@ -68,12 +68,10 @@ var editCmd = &cobra.Command{
 			return fmt.Errorf("error parsing edited file: %w", err)
 		}
 
-		if err := issue.Validate(edited); err != nil {
-			return fmt.Errorf("%w", err)
-		}
-
 		// IDs are immutable and the filename encodes the ID, so a changed ID
-		// would desynchronize LoadByID, NextID and the file name.
+		// would desynchronize LoadByID, NextID and the file name. Checked before
+		// Validate so a deleted or typoed id restores the file instead of leaving
+		// an unaddressable issue behind.
 		if edited.ID != id {
 			message := fmt.Sprintf("issue id changed from #%d to #%d; IDs are immutable", id, edited.ID)
 			if err := os.WriteFile(iss.FilePath, original, 0o644); err != nil {
@@ -83,6 +81,11 @@ var editCmd = &cobra.Command{
 			// this the file would carry a new id and `issues show` could not find it.
 			return fmt.Errorf("%s; original file restored", message)
 		}
+
+		if err := issue.Validate(edited); err != nil {
+			return fmt.Errorf("%w", err)
+		}
+
 		name := filepath.Base(edited.FilePath)
 		fileID, ok := issue.IDFromFilename(name)
 		if !ok {
@@ -98,7 +101,7 @@ var editCmd = &cobra.Command{
 		}
 
 		if cfg.AutoStage {
-			_ = git.Stage(edited.FilePath)
+			_ = git.Stage(issuesDir, edited.FilePath)
 		}
 
 		// Sync relation changes bidirectionally
@@ -114,7 +117,7 @@ var editCmd = &cobra.Command{
 				return fmt.Errorf("failed to sync relation with #%d: %w", entry.ID, err)
 			}
 			if cfg.AutoStage {
-				_ = git.Stage(target.FilePath)
+				_ = git.Stage(issuesDir, target.FilePath)
 			}
 		}
 		for _, entry := range removed {
@@ -127,7 +130,7 @@ var editCmd = &cobra.Command{
 				return fmt.Errorf("failed to sync relation with #%d: %w", entry.ID, err)
 			}
 			if cfg.AutoStage {
-				_ = git.Stage(target.FilePath)
+				_ = git.Stage(issuesDir, target.FilePath)
 			}
 		}
 

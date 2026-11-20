@@ -82,12 +82,7 @@ type checkContext struct {
 // runCheck loads the database, runs every consistency check and applies fixes
 // when asked. It does not print anything; look at the report instead.
 func runCheck(issuesDir string, autoFix bool) (*checkReport, error) {
-	issues, err := issue.LoadAll(issuesDir)
-	if err != nil {
-		return nil, err
-	}
-
-	broken, err := issue.BrokenFiles(issuesDir)
+	issues, broken, err := issue.LoadWithBroken(issuesDir)
 	if err != nil {
 		return nil, err
 	}
@@ -235,7 +230,7 @@ func (c *checkContext) saveFixes(issuesDir string) error {
 			continue
 		}
 		if cfg.AutoStage {
-			_ = git.Stage(iss.FilePath)
+			_ = git.Stage(issuesDir, iss.FilePath)
 		}
 	}
 	return nil

@@ -184,7 +184,6 @@ func TestEditRejectsInvalidFrontmatter(t *testing.T) {
 	}{
 		{"status", func(iss *issue.Issue) { iss.Status = "done" }, `invalid status "done"`},
 		{"priority", func(iss *issue.Issue) { iss.Priority = "urgent" }, `invalid priority "urgent"`},
-		{"id", func(iss *issue.Issue) { iss.ID = 0 }, "id must be > 0"},
 		{"created", func(iss *issue.Issue) { iss.Created = "01.01.2026" }, `invalid created date "01.01.2026"`},
 	}
 
@@ -260,6 +259,32 @@ func TestEditRejectsChangedID(t *testing.T) {
 	}
 	if len(matches) != 2 {
 		t.Errorf("issue files = %v, want no file created for the new id", matches)
+	}
+}
+
+func TestEditRestoresFileWhenIDBecomesInvalid(t *testing.T) {
+	repo := newCLIRepo(t)
+	orig := repo.seed(t, &issue.Issue{ID: 1, Title: "Keep me"})
+	before := readFile(t, orig.FilePath)
+
+	content := editTestContent(t, orig.FilePath, func(iss *issue.Issue) {
+		iss.ID = 0
+	})
+	editTestEditor(t, content)
+
+	stdout, _, err := repo.run(t, "edit", "1")
+	if err == nil {
+		t.Fatal("edit accepted an invalid id")
+	}
+	wantContains(t, "error", err.Error(), "issue id changed from #1 to #0")
+	wantContains(t, "error", err.Error(), "original file restored")
+	wantNotContains(t, "stdout", stdout, "Updated:")
+
+	if got := readFile(t, orig.FilePath); got != before {
+		t.Errorf("file was not restored:\nwant:\n%s\ngot:\n%s", before, got)
+	}
+	if got := repo.load(t, 1).Title; got != "Keep me" {
+		t.Errorf("#1 title = %q, want %q", got, "Keep me")
 	}
 }
 
