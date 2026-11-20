@@ -90,6 +90,54 @@ func TestDoneCLIMarksClosed(t *testing.T) {
 	}
 }
 
+func TestDoneCLIRefusesOpenBlockers(t *testing.T) {
+	repo := newCLIRepo(t)
+	repo.seed(t, &issue.Issue{ID: 1, Title: "Blocker", Status: "open"})
+	repo.seed(t, &issue.Issue{
+		ID: 2, Title: "Blocked", Status: "open",
+		Relations: issue.Relations{DependsOn: []int{1}},
+	})
+
+	stdout, stderr, err := repo.run(t, "done", "2")
+	if err == nil {
+		t.Fatal("done closed an issue with an open blocker")
+	}
+	wantContains(t, "error", err.Error(), "refusing to close #2 with open blockers in non-interactive mode (use --force)")
+	wantContains(t, "stderr", stderr, "Warning: #2 has open blocker: #1 (Blocker)")
+	wantNotContains(t, "stdout", stdout, "Done:")
+	if got := repo.load(t, 2); got.Status != "open" || got.Closed != "" {
+		t.Errorf("#2 = %q/%q, want open with empty closed", got.Status, got.Closed)
+	}
+
+	stdout, _, err = repo.run(t, "done", "2", "--force")
+	if err != nil {
+		t.Fatalf("done --force: %v", err)
+	}
+	wantContains(t, "stdout", stdout, "Done: #2 Blocked")
+	if got := repo.load(t, 2); got.Status != "closed" || got.Closed != issue.Today() {
+		t.Errorf("#2 = %q/%q, want closed with today's date", got.Status, got.Closed)
+	}
+}
+
+func TestDoneCLIAllowsResolvedBlockers(t *testing.T) {
+	repo := newCLIRepo(t)
+	repo.seed(t, &issue.Issue{ID: 1, Title: "Blocker", Status: "open"})
+	repo.seed(t, &issue.Issue{
+		ID: 2, Title: "Blocked", Status: "open",
+		Relations: issue.Relations{DependsOn: []int{1}},
+	})
+
+	if _, _, err := repo.run(t, "done", "1"); err != nil {
+		t.Fatalf("done 1: %v", err)
+	}
+	if _, _, err := repo.run(t, "done", "2"); err != nil {
+		t.Fatalf("done 2 with resolved blocker: %v", err)
+	}
+	if got := repo.load(t, 2).Status; got != "closed" {
+		t.Errorf("#2 status = %q, want closed", got)
+	}
+}
+
 func TestDoneCLIIssueNotFound(t *testing.T) {
 	repo := newCLIRepo(t)
 	repo.seed(t, &issue.Issue{ID: 1, Title: "Only issue"})

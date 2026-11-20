@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/steviee/git-issues/internal/config"
@@ -15,6 +16,7 @@ func init() {
 	batchCloseCmd.Flags().Bool("wontfix", false, "Close as wontfix")
 	batchCloseCmd.Flags().StringSlice("label", nil, "Filter by label (OR logic)")
 	batchCloseCmd.Flags().String("status", "open", "Filter by current status")
+	batchCloseCmd.Flags().Bool("force", false, "Close even if there are open blockers")
 
 	batchSetCmd.Flags().StringSlice("label", nil, "Filter by label (OR logic)")
 	batchSetCmd.Flags().String("status", "open", "Filter by current status")
@@ -46,13 +48,14 @@ var batchCloseCmd = &cobra.Command{
 		labels, _ := cmd.Flags().GetStringSlice("label")
 		status, _ := cmd.Flags().GetString("status")
 		wontfix, _ := cmd.Flags().GetBool("wontfix")
+		force, _ := cmd.Flags().GetBool("force")
 
 		issues, err := issue.LoadAll(issuesDir)
 		if err != nil {
 			return err
 		}
 
-		count := 0
+		var selected []*issue.Issue
 		for _, iss := range issues {
 			if status != "all" && iss.Status != status {
 				continue
@@ -60,7 +63,30 @@ var batchCloseCmd = &cobra.Command{
 			if len(labels) > 0 && !hasAnyLabel(iss.Labels, labels) {
 				continue
 			}
+			selected = append(selected, iss)
+		}
 
+		// Refuse the whole batch while any selected issue has open blockers, so
+		// a bulk close cannot bypass the guard `issues close` and `issues done` use.
+		if !force {
+			var blocked []string
+			for _, iss := range selected {
+				blockers := openBlockers(issuesDir, iss)
+				if len(blockers) == 0 {
+					continue
+				}
+				for _, b := range blockers {
+					fmt.Fprintf(os.Stderr, "Warning: #%d has open blocker: %s\n", iss.ID, b)
+				}
+				blocked = append(blocked, fmt.Sprintf("#%d", iss.ID))
+			}
+			if len(blocked) > 0 {
+				return fmt.Errorf("refusing to close %s with open blockers (use --force)", strings.Join(blocked, ", "))
+			}
+		}
+
+		count := 0
+		for _, iss := range selected {
 			if wontfix {
 				iss.Status = "wontfix"
 			} else {

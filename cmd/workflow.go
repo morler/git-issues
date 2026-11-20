@@ -14,6 +14,7 @@ func init() {
 	rootCmd.AddCommand(claimCmd)
 	rootCmd.AddCommand(doneCmd)
 	rootCmd.AddCommand(blockedCmd)
+	doneCmd.Flags().Bool("force", false, "Close even if there are open blockers")
 }
 
 var claimCmd = &cobra.Command{
@@ -82,6 +83,15 @@ var doneCmd = &cobra.Command{
 		iss, err := issue.LoadByID(issuesDir, id)
 		if err != nil {
 			return fmt.Errorf("issue #%d not found", id)
+		}
+
+		force, _ := cmd.Flags().GetBool("force")
+		proceed, err := closeWithBlockersGate(issuesDir, iss, force)
+		if err != nil {
+			return err
+		}
+		if !proceed {
+			return nil
 		}
 
 		iss.Status = "closed"

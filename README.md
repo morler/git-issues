@@ -117,7 +117,7 @@ Designed for AI agent workflows with machine-readable output:
 |---------|-------------|
 | `issues next [--format json]` | Next unblocked, highest-priority issue |
 | `issues claim <id>` | Set status to in-progress |
-| `issues done <id>` | Close the issue |
+| `issues done <id> [--force]` | Close the issue (respects open blockers) |
 | `issues blocked [id]` | List blocked issues or show blockers for one issue |
 | `issues check [--fix]` | Verify database consistency, optionally auto-fix |
 
@@ -125,7 +125,7 @@ Designed for AI agent workflows with machine-readable output:
 
 | Command | Description |
 |---------|-------------|
-| `issues batch close [--label L] [--status S]` | Close all matching issues |
+| `issues batch close [--label L] [--status S] [--force]` | Close all matching issues |
 | `issues batch set <field> <value> [--label L] [--status S]` | Set field on all matching issues |
 
 ### Other
@@ -175,7 +175,7 @@ issues graph --open-only
 
 Relation types: `blocks`, `depends-on`, `related-to`, `duplicates`.
 
-`issues close` warns if an issue has open blockers.
+`issues close` and `issues done` warn about open blockers: outside a terminal they refuse unless `--force` is passed, on a terminal they ask for confirmation. `issues batch close` changes nothing while any matching issue has open blockers unless `--force` is used.
 
 ## AI Agent Integration
 

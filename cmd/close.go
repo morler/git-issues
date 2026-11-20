@@ -48,24 +48,12 @@ var closeCmd = &cobra.Command{
 
 		// Check for open blockers
 		force, _ := cmd.Flags().GetBool("force")
-		if len(iss.Relations.DependsOn) > 0 {
-			blockers := openBlockers(issuesDir, iss)
-			if len(blockers) > 0 && !force {
-				for _, b := range blockers {
-					fmt.Fprintf(os.Stderr, "Warning: #%d has open blocker: %s\n", id, b)
-				}
-				if !stdinIsTerminal() {
-					return fmt.Errorf("refusing to close #%d with open blockers in non-interactive mode (use --force)", id)
-				}
-				fmt.Fprint(os.Stderr, "Close anyway? [y/N] ")
-				reader := bufio.NewReader(os.Stdin)
-				answer, _ := reader.ReadString('\n')
-				answer = strings.TrimSpace(strings.ToLower(answer))
-				if answer != "y" && answer != "yes" {
-					fmt.Println("Aborted.")
-					return nil
-				}
-			}
+		proceed, err := closeWithBlockersGate(issuesDir, iss, force)
+		if err != nil {
+			return err
+		}
+		if !proceed {
+			return nil
 		}
 
 		wontfix, _ := cmd.Flags().GetBool("wontfix")
@@ -100,6 +88,40 @@ var closeCmd = &cobra.Command{
 
 func stdinIsTerminal() bool {
 	return term.IsTerminal(int(os.Stdin.Fd()))
+}
+
+// closeWithBlockersGate applies the shared close policy for one issue: open
+// blockers are reported on stderr, --force skips the check, an interactive
+// terminal prompts for confirmation, and non-interactive callers get a hard
+// error. proceed is false when the close must not happen; err is nil when the
+// user declined the prompt.
+func closeWithBlockersGate(issuesDir string, iss *issue.Issue, force bool) (proceed bool, err error) {
+	if force || len(iss.Relations.DependsOn) == 0 {
+		return true, nil
+	}
+
+	blockers := openBlockers(issuesDir, iss)
+	if len(blockers) == 0 {
+		return true, nil
+	}
+
+	for _, b := range blockers {
+		fmt.Fprintf(os.Stderr, "Warning: #%d has open blocker: %s\n", iss.ID, b)
+	}
+
+	if !stdinIsTerminal() {
+		return false, fmt.Errorf("refusing to close #%d with open blockers in non-interactive mode (use --force)", iss.ID)
+	}
+
+	fmt.Fprint(os.Stderr, "Close anyway? [y/N] ")
+	reader := bufio.NewReader(os.Stdin)
+	answer, _ := reader.ReadString('\n')
+	answer = strings.TrimSpace(strings.ToLower(answer))
+	if answer != "y" && answer != "yes" {
+		fmt.Println("Aborted.")
+		return false, nil
+	}
+	return true, nil
 }
 
 func openBlockers(issuesDir string, iss *issue.Issue) []string {

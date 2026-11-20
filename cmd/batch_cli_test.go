@@ -214,6 +214,63 @@ func TestBatchCloseNoMatches(t *testing.T) {
 	wantBatchUnchanged(t, repo.issuesDir, before)
 }
 
+func TestBatchCloseRefusesOpenBlockers(t *testing.T) {
+	repo := newCLIRepo(t)
+	repo.seed(t, &issue.Issue{ID: 1, Title: "Root", Status: "open"})
+	repo.seed(t, &issue.Issue{
+		ID: 2, Title: "Blocked", Status: "open",
+		Relations: issue.Relations{DependsOn: []int{1}},
+	})
+	repo.seed(t, &issue.Issue{ID: 3, Title: "Free", Status: "open"})
+	before := batchSnapshot(t, repo.issuesDir)
+
+	stdout, stderr, err := repo.run(t, "batch", "close")
+	if err == nil {
+		t.Fatal("batch close ignored an open blocker")
+	}
+	wantContains(t, "error", err.Error(), "refusing to close #2 with open blockers (use --force)")
+	wantContains(t, "stderr", stderr, "Warning: #2 has open blocker: #1 (Root)")
+	wantNotContains(t, "stdout", stdout, "Closed:")
+	wantBatchUnchanged(t, repo.issuesDir, before)
+}
+
+func TestBatchCloseForceWithOpenBlockers(t *testing.T) {
+	repo := newCLIRepo(t)
+	repo.seed(t, &issue.Issue{ID: 1, Title: "Root", Status: "open"})
+	repo.seed(t, &issue.Issue{
+		ID: 2, Title: "Blocked", Status: "open",
+		Relations: issue.Relations{DependsOn: []int{1}},
+	})
+	repo.seed(t, &issue.Issue{ID: 3, Title: "Free", Status: "open"})
+
+	stdout, _, err := repo.run(t, "batch", "close", "--force")
+	if err != nil {
+		t.Fatalf("batch close --force: %v", err)
+	}
+	wantContains(t, "stdout", stdout, "\n3 issues closed.\n")
+	for id := 1; id <= 3; id++ {
+		if got := repo.load(t, id).Status; got != "closed" {
+			t.Errorf("#%d status = %q, want closed", id, got)
+		}
+	}
+}
+
+func TestBatchCloseAllowsResolvedBlockers(t *testing.T) {
+	repo := newCLIRepo(t)
+	repo.seed(t, &issue.Issue{ID: 1, Title: "Root", Status: "closed"})
+	repo.seed(t, &issue.Issue{
+		ID: 2, Title: "Blocked", Status: "open",
+		Relations: issue.Relations{DependsOn: []int{1}},
+	})
+
+	if _, _, err := repo.run(t, "batch", "close"); err != nil {
+		t.Fatalf("batch close with resolved blocker: %v", err)
+	}
+	if got := repo.load(t, 2).Status; got != "closed" {
+		t.Errorf("#2 status = %q, want closed", got)
+	}
+}
+
 func TestBatchSetPriority(t *testing.T) {
 	repo := newCLIRepo(t)
 	repo.seed(t, newBatchIssue(1, "Open one", "open", nil))
