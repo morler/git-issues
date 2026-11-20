@@ -643,7 +643,15 @@ install: build
 test:
     go test ./...
 
-lint:
+fmt-check:
+    @unformatted=$$(gofmt -l $$(git ls-files '*.go')); \
+    if [ -n "$$unformatted" ]; then \
+        echo "Unformatted files:"; \
+        echo "$$unformatted"; \
+        exit 1; \
+    fi
+
+lint: fmt-check
     go vet ./...
     golangci-lint run ./...
 ```
