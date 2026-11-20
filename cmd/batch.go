@@ -128,6 +128,12 @@ var batchSetCmd = &cobra.Command{
 			return err
 		}
 
+		// Validate once up front: matching no issues must not turn a typo in a
+		// scripted call into a silent success.
+		if err := validateBatchSet(field, value); err != nil {
+			return err
+		}
+
 		labels, _ := cmd.Flags().GetStringSlice("label")
 		status, _ := cmd.Flags().GetString("status")
 
@@ -147,14 +153,8 @@ var batchSetCmd = &cobra.Command{
 
 			switch field {
 			case "priority":
-				if !contains(issue.ValidPriorities, value) {
-					return fmt.Errorf("invalid priority %q, must be one of: %s", value, strings.Join(issue.ValidPriorities, ", "))
-				}
 				iss.Priority = value
 			case "status":
-				if !contains(issue.ValidStatuses, value) {
-					return fmt.Errorf("invalid status %q, must be one of: %s", value, strings.Join(issue.ValidStatuses, ", "))
-				}
 				iss.Status = value
 				if value == "closed" || value == "wontfix" {
 					iss.Closed = issue.Today()
@@ -176,8 +176,6 @@ var batchSetCmd = &cobra.Command{
 						iss.Labels[i] = strings.TrimSpace(iss.Labels[i])
 					}
 				}
-			default:
-				return fmt.Errorf("unknown field %q for batch set, must be one of: priority, status, label", field)
 			}
 
 			if err := issue.Save(issuesDir, iss); err != nil {
@@ -194,4 +192,23 @@ var batchSetCmd = &cobra.Command{
 		fmt.Printf("\n%d issues updated.\n", count)
 		return nil
 	},
+}
+
+// validateBatchSet rejects unknown fields and invalid enum values before any
+// issue is matched, so the same call fails whether or not the filter hits.
+func validateBatchSet(field, value string) error {
+	switch field {
+	case "priority":
+		if !contains(issue.ValidPriorities, value) {
+			return fmt.Errorf("invalid priority %q, must be one of: %s", value, strings.Join(issue.ValidPriorities, ", "))
+		}
+	case "status":
+		if !contains(issue.ValidStatuses, value) {
+			return fmt.Errorf("invalid status %q, must be one of: %s", value, strings.Join(issue.ValidStatuses, ", "))
+		}
+	case "label":
+	default:
+		return fmt.Errorf("unknown field %q for batch set, must be one of: priority, status, label", field)
+	}
+	return nil
 }

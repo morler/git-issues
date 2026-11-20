@@ -453,6 +453,34 @@ func TestBatchSetInvalidStatus(t *testing.T) {
 	wantBatchUnchanged(t, repo.issuesDir, before)
 }
 
+func TestBatchSetNoMatchesStillValidates(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"invalid priority", []string{"batch", "set", "priority", "urgent", "--status", "closed"}, `invalid priority "urgent"`},
+		{"invalid status", []string{"batch", "set", "status", "done", "--status", "closed"}, `invalid status "done"`},
+		{"unknown field", []string{"batch", "set", "title", "New title", "--status", "closed"}, `unknown field "title" for batch set`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := newCLIRepo(t)
+			repo.seed(t, newBatchIssue(1, "Open only", "open", nil))
+			before := batchSnapshot(t, repo.issuesDir)
+
+			stdout, _, err := repo.run(t, tt.args...)
+			if err == nil {
+				t.Fatalf("%v accepted invalid input when no issue matched", tt.args)
+			}
+			wantContains(t, "error", err.Error(), tt.want)
+			wantNotContains(t, "stdout", stdout, "issues updated")
+			wantBatchUnchanged(t, repo.issuesDir, before)
+		})
+	}
+}
+
 func TestBatchSetLabelFilterNoMatches(t *testing.T) {
 	repo := newCLIRepo(t)
 	repo.seed(t, newBatchIssue(1, "Bug", "open", []string{"bug"}))

@@ -1,12 +1,13 @@
 ---
 id: 25
 title: batch set accepts invalid fields and values when nothing matches
-status: open
+status: closed
 priority: medium
 labels:
     - bug
 created: "2026-11-19"
-updated: "2026-11-19"
+updated: "2026-11-20"
+closed: "2026-11-20"
 ---
 
 Repro: `issues batch set priority urgent --status closed` with no matching issues prints `0 issues updated.` and exits 0.
