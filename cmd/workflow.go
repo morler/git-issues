@@ -40,7 +40,7 @@ var claimCmd = &cobra.Command{
 
 		iss, err := issue.LoadByID(issuesDir, id)
 		if err != nil {
-			return fmt.Errorf("issue #%d not found", id)
+			return err
 		}
 
 		iss.Status = "in-progress"
@@ -82,7 +82,7 @@ var doneCmd = &cobra.Command{
 
 		iss, err := issue.LoadByID(issuesDir, id)
 		if err != nil {
-			return fmt.Errorf("issue #%d not found", id)
+			return err
 		}
 
 		force, _ := cmd.Flags().GetBool("force")

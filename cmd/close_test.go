@@ -37,12 +37,36 @@ func TestOpenBlockers(t *testing.T) {
 
 	iss := saveTestIssue(t, dir, 5, "open", []int{1, 2, 3, 4, 99})
 
-	blockers := openBlockers(dir, iss)
+	blockers, err := openBlockers(dir, iss)
+	if err != nil {
+		t.Fatalf("openBlockers: %v", err)
+	}
 	if len(blockers) != 2 {
 		t.Fatalf("expected 2 open blockers, got %d: %v", len(blockers), blockers)
 	}
 	if !strings.Contains(blockers[0], "#1") || !strings.Contains(blockers[1], "#2") {
 		t.Errorf("unexpected blockers: %v", blockers)
+	}
+}
+
+func TestOpenBlockersReportsReadFailure(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("permission checks do not apply to root")
+	}
+
+	dir := t.TempDir()
+	iss := saveTestIssue(t, dir, 1, "open", []int{2})
+	saveTestIssue(t, dir, 2, "open", nil)
+
+	if err := os.Chmod(dir, 0o111); err != nil {
+		t.Fatalf("chmod issues dir: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(dir, 0o755) })
+
+	if _, err := openBlockers(dir, iss); err == nil {
+		t.Fatal("openBlockers hid an unreadable issues directory")
+	} else {
+		wantContains(t, "error", err.Error(), "permission denied")
 	}
 }
 

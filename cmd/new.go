@@ -174,7 +174,7 @@ func openEditor(cfg *config.Config) (title, priority string, labels []string, bo
 func ensureIssuesExist(issuesDir string, ids []int) error {
 	for _, id := range ids {
 		if _, err := issue.LoadByID(issuesDir, id); err != nil {
-			return fmt.Errorf("issue #%d not found", id)
+			return err
 		}
 	}
 	return nil

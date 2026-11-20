@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"bufio"
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -43,7 +44,7 @@ var closeCmd = &cobra.Command{
 
 		iss, err := issue.LoadByID(issuesDir, id)
 		if err != nil {
-			return fmt.Errorf("issue #%d not found", id)
+			return err
 		}
 
 		// Check for open blockers
@@ -100,7 +101,10 @@ func closeWithBlockersGate(issuesDir string, iss *issue.Issue, force bool) (proc
 		return true, nil
 	}
 
-	blockers := openBlockers(issuesDir, iss)
+	blockers, err := openBlockers(issuesDir, iss)
+	if err != nil {
+		return false, err
+	}
 	if len(blockers) == 0 {
 		return true, nil
 	}
@@ -124,18 +128,23 @@ func closeWithBlockersGate(issuesDir string, iss *issue.Issue, force bool) (proc
 	return true, nil
 }
 
-func openBlockers(issuesDir string, iss *issue.Issue) []string {
+// openBlockers lists the open dependencies of iss. Dangling references are
+// skipped, a read failure is returned so it cannot silently disable the guard.
+func openBlockers(issuesDir string, iss *issue.Issue) ([]string, error) {
 	var blockers []string
 	for _, depID := range iss.Relations.DependsOn {
 		dep, err := issue.LoadByID(issuesDir, depID)
 		if err != nil {
-			continue
+			if errors.Is(err, issue.ErrNotFound) {
+				continue
+			}
+			return nil, err
 		}
 		if dep.Status == "open" || dep.Status == "in-progress" {
 			blockers = append(blockers, fmt.Sprintf("#%d (%s)", dep.ID, dep.Title))
 		}
 	}
-	return blockers
+	return blockers, nil
 }
 
 // openBlockersFrom lists the open dependencies of iss from the already loaded

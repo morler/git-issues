@@ -49,7 +49,7 @@ var setCmd = &cobra.Command{
 
 		iss, err := issue.LoadByID(issuesDir, id)
 		if err != nil {
-			return fmt.Errorf("issue #%d not found", id)
+			return err
 		}
 
 		switch field {

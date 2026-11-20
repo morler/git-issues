@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -39,7 +40,7 @@ var editCmd = &cobra.Command{
 
 		iss, err := issue.LoadByID(issuesDir, id)
 		if err != nil {
-			return fmt.Errorf("issue #%d not found", id)
+			return err
 		}
 
 		// Snapshot old relations for diff (will be used in Phase 5)
@@ -110,7 +111,10 @@ var editCmd = &cobra.Command{
 			// Source already has the relation from user edit, just update target's inverse
 			target, err := issue.LoadByID(issuesDir, entry.ID)
 			if err != nil {
-				continue
+				if errors.Is(err, issue.ErrNotFound) {
+					continue // dangling reference; check reports it
+				}
+				return fmt.Errorf("failed to sync relation with #%d: %w", entry.ID, err)
 			}
 			issue.AddToSlice(target, issue.Inverse(entry.Relation), id)
 			if err := issue.Save(issuesDir, target); err != nil {
@@ -123,7 +127,10 @@ var editCmd = &cobra.Command{
 		for _, entry := range removed {
 			target, err := issue.LoadByID(issuesDir, entry.ID)
 			if err != nil {
-				continue
+				if errors.Is(err, issue.ErrNotFound) {
+					continue // dangling reference; check reports it
+				}
+				return fmt.Errorf("failed to sync relation with #%d: %w", entry.ID, err)
 			}
 			issue.RemoveFromSlice(target, issue.Inverse(entry.Relation), id)
 			if err := issue.Save(issuesDir, target); err != nil {
