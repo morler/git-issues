@@ -18,6 +18,10 @@ func init() {
 	rootCmd.AddCommand(editCmd)
 }
 
+// errSyncRelation wraps a failure to mirror a relation change onto the target
+// issue; the argument is the target ID and the underlying error.
+const errSyncRelation = "failed to sync relation with #%d: %w"
+
 var editCmd = &cobra.Command{
 	Use:   "edit <id>",
 	Short: "Edit an issue in $EDITOR",
@@ -114,11 +118,11 @@ var editCmd = &cobra.Command{
 				if errors.Is(err, issue.ErrNotFound) {
 					continue // dangling reference; check reports it
 				}
-				return fmt.Errorf("failed to sync relation with #%d: %w", entry.ID, err)
+				return fmt.Errorf(errSyncRelation, entry.ID, err)
 			}
 			issue.AddToSlice(target, issue.Inverse(entry.Relation), id)
 			if err := issue.Save(issuesDir, target); err != nil {
-				return fmt.Errorf("failed to sync relation with #%d: %w", entry.ID, err)
+				return fmt.Errorf(errSyncRelation, entry.ID, err)
 			}
 			if cfg.AutoStage {
 				_ = git.Stage(issuesDir, target.FilePath)
@@ -130,11 +134,11 @@ var editCmd = &cobra.Command{
 				if errors.Is(err, issue.ErrNotFound) {
 					continue // dangling reference; check reports it
 				}
-				return fmt.Errorf("failed to sync relation with #%d: %w", entry.ID, err)
+				return fmt.Errorf(errSyncRelation, entry.ID, err)
 			}
 			issue.RemoveFromSlice(target, issue.Inverse(entry.Relation), id)
 			if err := issue.Save(issuesDir, target); err != nil {
-				return fmt.Errorf("failed to sync relation with #%d: %w", entry.ID, err)
+				return fmt.Errorf(errSyncRelation, entry.ID, err)
 			}
 			if cfg.AutoStage {
 				_ = git.Stage(issuesDir, target.FilePath)

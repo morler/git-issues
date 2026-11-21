@@ -99,24 +99,31 @@ func filterIssues(issues []*issue.Issue, opts filterOptions) []*issue.Issue {
 	// Start non-nil so an empty result marshals as [] instead of null.
 	filtered := make([]*issue.Issue, 0, len(issues))
 	for _, iss := range issues {
-		if opts.status != "all" && iss.Status != opts.status {
-			continue
+		if matchesFilters(iss, opts) {
+			filtered = append(filtered, iss)
 		}
-		if opts.priority != "" && iss.Priority != opts.priority {
-			continue
-		}
-		if len(opts.labels) > 0 && !hasAnyLabel(iss.Labels, opts.labels) {
-			continue
-		}
-		if opts.blocksID != 0 && !containsInt(iss.Relations.Blocks, opts.blocksID) {
-			continue
-		}
-		if opts.dependsOnID != 0 && !containsInt(iss.Relations.DependsOn, opts.dependsOnID) {
-			continue
-		}
-		filtered = append(filtered, iss)
 	}
 	return filtered
+}
+
+// matchesFilters reports whether an issue satisfies every active filter.
+func matchesFilters(iss *issue.Issue, opts filterOptions) bool {
+	if opts.status != "all" && iss.Status != opts.status {
+		return false
+	}
+	if opts.priority != "" && iss.Priority != opts.priority {
+		return false
+	}
+	if len(opts.labels) > 0 && !hasAnyLabel(iss.Labels, opts.labels) {
+		return false
+	}
+	if opts.blocksID != 0 && !containsInt(iss.Relations.Blocks, opts.blocksID) {
+		return false
+	}
+	if opts.dependsOnID != 0 && !containsInt(iss.Relations.DependsOn, opts.dependsOnID) {
+		return false
+	}
+	return true
 }
 
 func hasAnyLabel(issueLabels, filterLabels []string) bool {
@@ -183,61 +190,15 @@ func printTable(issues []*issue.Issue, issueMap map[int]*issue.Issue, opts filte
 		padRight("ID", 6), padRight("PRI", 10), padRight("STATUS", 13), padRight("TITLE", 46), padRight("LABELS", 14), "")
 
 	for _, iss := range issues {
-		title := truncateDisplay(iss.Title, 44)
-
-		labelsStr := ""
-		if len(iss.Labels) > 0 {
-			labelsStr = "[" + strings.Join(iss.Labels, ", ") + "]"
-		}
-
-		// Check relation indicators
-		relStr := ""
-
-		// Blocks open issues?
-		var blocksOpen []int
-		for _, bid := range iss.Relations.Blocks {
-			if blocked, ok := issueMap[bid]; ok {
-				if blocked.Status == "open" || blocked.Status == "in-progress" {
-					blocksOpen = append(blocksOpen, bid)
-				}
-			}
-		}
-		if len(blocksOpen) > 0 {
-			ids := make([]string, len(blocksOpen))
-			for i, id := range blocksOpen {
-				ids[i] = fmt.Sprintf("%d", id)
-			}
-			relStr = "⬛ " + strings.Join(ids, ",")
-			hasSymbols = true
-		}
-
-		// Blocked by open issue?
-		var blockedBy []int
-		for _, did := range iss.Relations.DependsOn {
-			if dep, ok := issueMap[did]; ok {
-				if dep.Status == "open" || dep.Status == "in-progress" {
-					blockedBy = append(blockedBy, did)
-				}
-			}
-		}
-		if len(blockedBy) > 0 {
-			ids := make([]string, len(blockedBy))
-			for i, id := range blockedBy {
-				ids[i] = fmt.Sprintf("%d", id)
-			}
-			if relStr != "" {
-				relStr += "  "
-			}
-			relStr += "⬜ " + strings.Join(ids, ",")
-			hasSymbols = true
-		}
+		relStr, hasMarker := relationMarker(iss, issueMap)
+		hasSymbols = hasSymbols || hasMarker
 
 		_, _ = fmt.Fprintf(os.Stdout, "%s%s%s%s%s%s\n",
 			padRight(fmt.Sprintf("%04d", iss.ID), 6),
 			padRight(iss.Priority, 10),
 			padRight(iss.Status, 13),
-			padRight(title, 46),
-			padRight(labelsStr, 14),
+			padRight(truncateDisplay(iss.Title, 44), 46),
+			padRight(formatLabels(iss.Labels), 14),
 			relStr)
 	}
 
@@ -245,4 +206,47 @@ func printTable(issues []*issue.Issue, issueMap map[int]*issue.Issue, opts filte
 		fmt.Println()
 		fmt.Println("⬛ = blocks open issues   ⬜ = blocked by open issue")
 	}
+}
+
+// formatLabels renders the label column, or an empty string when the issue has
+// no labels.
+func formatLabels(labels []string) string {
+	if len(labels) == 0 {
+		return ""
+	}
+	return "[" + strings.Join(labels, ", ") + "]"
+}
+
+// relationMarker renders the ⬛/⬜ relation column and reports whether any
+// marker was printed. Only relations to still-open issues count, so a closed
+// blocker disappears from the table.
+func relationMarker(iss *issue.Issue, issueMap map[int]*issue.Issue) (string, bool) {
+	parts := make([]string, 0, 2)
+	if ids := openIDs(iss.Relations.Blocks, issueMap); len(ids) > 0 {
+		parts = append(parts, "⬛ "+formatIDList(ids))
+	}
+	if ids := openIDs(iss.Relations.DependsOn, issueMap); len(ids) > 0 {
+		parts = append(parts, "⬜ "+formatIDList(ids))
+	}
+	return strings.Join(parts, "  "), len(parts) > 0
+}
+
+// openIDs filters ids down to the issues that are still open or in progress.
+func openIDs(ids []int, issueMap map[int]*issue.Issue) []int {
+	var open []int
+	for _, id := range ids {
+		related, ok := issueMap[id]
+		if ok && (related.Status == issue.StatusOpen || related.Status == issue.StatusInProgress) {
+			open = append(open, id)
+		}
+	}
+	return open
+}
+
+func formatIDList(ids []int) string {
+	parts := make([]string, len(ids))
+	for i, id := range ids {
+		parts[i] = fmt.Sprintf("%d", id)
+	}
+	return strings.Join(parts, ",")
 }

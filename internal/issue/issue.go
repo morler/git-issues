@@ -10,7 +10,24 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-var ValidStatuses = []string{"open", "in-progress", "closed", "wontfix"}
+// Statuses accepted in the `status` field.
+const (
+	StatusOpen       = "open"
+	StatusInProgress = "in-progress"
+	StatusClosed     = "closed"
+	StatusWontfix    = "wontfix"
+)
+
+// Relation names, as used by the `relate`/`unrelate` commands, the `new`
+// flags and the frontmatter keys.
+const (
+	RelationBlocks     = "blocks"
+	RelationDependsOn  = "depends-on"
+	RelationRelatedTo  = "related-to"
+	RelationDuplicates = "duplicates"
+)
+
+var ValidStatuses = []string{StatusOpen, StatusInProgress, StatusClosed, StatusWontfix}
 var ValidPriorities = []string{"low", "medium", "high", "critical"}
 
 type Relations struct {

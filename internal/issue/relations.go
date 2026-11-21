@@ -15,10 +15,10 @@ type RelationEntry struct {
 
 func Inverse(relation string) string {
 	switch relation {
-	case "blocks":
-		return "depends-on"
-	case "depends-on":
-		return "blocks"
+	case RelationBlocks:
+		return RelationDependsOn
+	case RelationDependsOn:
+		return RelationBlocks
 	default:
 		return relation // related-to, duplicates are self-inverse
 	}
@@ -121,23 +121,23 @@ func DiffRelations(oldRel, newRel Relations) (added, removed []RelationEntry) {
 		}
 	}
 
-	diffSlice("blocks", oldRel.Blocks, newRel.Blocks)
-	diffSlice("depends-on", oldRel.DependsOn, newRel.DependsOn)
-	diffSlice("related-to", oldRel.RelatedTo, newRel.RelatedTo)
-	diffSlice("duplicates", oldRel.Duplicates, newRel.Duplicates)
+	diffSlice(RelationBlocks, oldRel.Blocks, newRel.Blocks)
+	diffSlice(RelationDependsOn, oldRel.DependsOn, newRel.DependsOn)
+	diffSlice(RelationRelatedTo, oldRel.RelatedTo, newRel.RelatedTo)
+	diffSlice(RelationDuplicates, oldRel.Duplicates, newRel.Duplicates)
 
 	return
 }
 
 func getSlice(iss *Issue, relation string) *[]int {
 	switch relation {
-	case "blocks":
+	case RelationBlocks:
 		return &iss.Relations.Blocks
-	case "depends-on":
+	case RelationDependsOn:
 		return &iss.Relations.DependsOn
-	case "related-to":
+	case RelationRelatedTo:
 		return &iss.Relations.RelatedTo
-	case "duplicates":
+	case RelationDuplicates:
 		return &iss.Relations.Duplicates
 	default:
 		return nil

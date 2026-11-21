@@ -174,7 +174,7 @@ var batchSetCmd = &cobra.Command{
 			case "label":
 				if strings.HasPrefix(value, "+") {
 					label := value[1:]
-					if !containsStr(iss.Labels, label) {
+					if !contains(iss.Labels, label) {
 						iss.Labels = append(iss.Labels, label)
 					}
 				} else if strings.HasPrefix(value, "-") {

@@ -76,7 +76,7 @@ var setCmd = &cobra.Command{
 		case "label":
 			if strings.HasPrefix(value, "+") {
 				label := value[1:]
-				if !containsStr(iss.Labels, label) {
+				if !contains(iss.Labels, label) {
 					iss.Labels = append(iss.Labels, label)
 				}
 			} else if strings.HasPrefix(value, "-") {
@@ -119,15 +119,6 @@ func setArgs(args []string) []string {
 }
 
 func contains(slice []string, val string) bool {
-	for _, s := range slice {
-		if s == val {
-			return true
-		}
-	}
-	return false
-}
-
-func containsStr(slice []string, val string) bool {
 	for _, s := range slice {
 		if s == val {
 			return true

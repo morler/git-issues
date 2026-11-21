@@ -49,25 +49,31 @@ func waitForChange(w *fsnotify.Watcher) tea.Cmd {
 				if !ok {
 					return nil
 				}
-				if ev.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) != 0 {
-					time.Sleep(watchDebounce)
-					// Drain any queued events.
-					for {
-						select {
-						case _, ok := <-w.Events:
-							if !ok {
-								return reloadMsg{}
-							}
-						default:
-							return reloadMsg{}
-						}
-					}
+				if ev.Op&(fsnotify.Write|fsnotify.Create|fsnotify.Remove|fsnotify.Rename) == 0 {
+					continue
 				}
+				time.Sleep(watchDebounce)
+				return drainEvents(w)
 			case _, ok := <-w.Errors:
 				if !ok {
 					return nil
 				}
 			}
+		}
+	}
+}
+
+// drainEvents discards the burst of events queued behind the current change so
+// the debounce window produces a single reload.
+func drainEvents(w *fsnotify.Watcher) tea.Msg {
+	for {
+		select {
+		case _, ok := <-w.Events:
+			if !ok {
+				return reloadMsg{}
+			}
+		default:
+			return reloadMsg{}
 		}
 	}
 }

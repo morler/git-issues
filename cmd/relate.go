@@ -10,7 +10,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var validRelations = []string{"blocks", "depends-on", "related-to", "duplicates"}
+var validRelations = []string{
+	issue.RelationBlocks,
+	issue.RelationDependsOn,
+	issue.RelationRelatedTo,
+	issue.RelationDuplicates,
+}
 
 func init() {
 	rootCmd.AddCommand(relateCmd)

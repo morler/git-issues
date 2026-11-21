@@ -43,7 +43,7 @@ var claimCmd = &cobra.Command{
 			return err
 		}
 
-		iss.Status = "in-progress"
+		iss.Status = issue.StatusInProgress
 		iss.Closed = ""
 
 		if err := issue.Save(issuesDir, iss); err != nil {
@@ -94,7 +94,7 @@ var doneCmd = &cobra.Command{
 			return nil
 		}
 
-		iss.Status = "closed"
+		iss.Status = issue.StatusClosed
 		iss.Closed = issue.Today()
 
 		if err := issue.Save(issuesDir, iss); err != nil {
@@ -155,7 +155,7 @@ var blockedCmd = &cobra.Command{
 					continue
 				}
 				status := ""
-				if dep.Status == "open" || dep.Status == "in-progress" {
+				if dep.Status == issue.StatusOpen || dep.Status == issue.StatusInProgress {
 					status = " ← OPEN"
 					hasOpenBlockers = true
 				}
@@ -170,13 +170,13 @@ var blockedCmd = &cobra.Command{
 		// List all blocked open issues
 		found := false
 		for _, iss := range issues {
-			if iss.Status != "open" && iss.Status != "in-progress" {
+			if iss.Status != issue.StatusOpen && iss.Status != issue.StatusInProgress {
 				continue
 			}
 			var openBlockers []int
 			for _, depID := range iss.Relations.DependsOn {
 				dep, ok := issueMap[depID]
-				if ok && (dep.Status == "open" || dep.Status == "in-progress") {
+				if ok && (dep.Status == issue.StatusOpen || dep.Status == issue.StatusInProgress) {
 					openBlockers = append(openBlockers, depID)
 				}
 			}

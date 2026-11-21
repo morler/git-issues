@@ -19,9 +19,9 @@ func init() {
 	newCmd.Flags().StringP("priority", "p", "", "Priority (low|medium|high|critical)")
 	newCmd.Flags().StringSliceP("label", "l", nil, "Labels (repeatable)")
 	newCmd.Flags().StringP("body", "b", "", "Issue body")
-	newCmd.Flags().IntSlice("blocks", nil, "IDs this issue blocks (repeatable)")
-	newCmd.Flags().IntSlice("depends-on", nil, "IDs this issue depends on (repeatable)")
-	newCmd.Flags().IntSlice("related-to", nil, "IDs related to this issue (repeatable)")
+	newCmd.Flags().IntSlice(issue.RelationBlocks, nil, "IDs this issue blocks (repeatable)")
+	newCmd.Flags().IntSlice(issue.RelationDependsOn, nil, "IDs this issue depends on (repeatable)")
+	newCmd.Flags().IntSlice(issue.RelationRelatedTo, nil, "IDs related to this issue (repeatable)")
 	rootCmd.AddCommand(newCmd)
 }
 
@@ -55,9 +55,9 @@ var newCmd = &cobra.Command{
 		priority, _ := cmd.Flags().GetString("priority")
 		labels, _ := cmd.Flags().GetStringSlice("label")
 		body, _ := cmd.Flags().GetString("body")
-		blocks, _ := cmd.Flags().GetIntSlice("blocks")
-		dependsOn, _ := cmd.Flags().GetIntSlice("depends-on")
-		relatedTo, _ := cmd.Flags().GetIntSlice("related-to")
+		blocks, _ := cmd.Flags().GetIntSlice(issue.RelationBlocks)
+		dependsOn, _ := cmd.Flags().GetIntSlice(issue.RelationDependsOn)
+		relatedTo, _ := cmd.Flags().GetIntSlice(issue.RelationRelatedTo)
 
 		if priority == "" {
 			priority = cfg.DefaultPriority
@@ -111,14 +111,17 @@ var newCmd = &cobra.Command{
 		}
 
 		// Sync relations bidirectionally
-		if err := applyRelations(issuesDir, nextID, "blocks", blocks, cfg); err != nil {
-			return err
-		}
-		if err := applyRelations(issuesDir, nextID, "depends-on", dependsOn, cfg); err != nil {
-			return err
-		}
-		if err := applyRelations(issuesDir, nextID, "related-to", relatedTo, cfg); err != nil {
-			return err
+		for _, rel := range []struct {
+			name string
+			ids  []int
+		}{
+			{issue.RelationBlocks, blocks},
+			{issue.RelationDependsOn, dependsOn},
+			{issue.RelationRelatedTo, relatedTo},
+		} {
+			if err := applyRelations(issuesDir, nextID, rel.name, rel.ids, cfg); err != nil {
+				return err
+			}
 		}
 
 		filename := filepath.Base(iss.FilePath)
