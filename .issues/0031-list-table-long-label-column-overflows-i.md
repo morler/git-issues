@@ -1,13 +1,14 @@
 ---
 id: 31
 title: 'list table: long label column overflows into the relation column'
-status: open
+status: closed
 priority: low
 labels:
     - bug
     - quality
 created: "2026-11-20"
-updated: "2026-11-20"
+updated: "2026-11-21"
+closed: "2026-11-21"
 ---
 
 `cmd/list.go:240` pads the label column with `padRight(labelsStr, 14)`, but `padRight` (`cmd/text.go:13`) only pads and never truncates. Labels wider than 14 cells run straight into the relation markers, e.g. `[bug, auth, feature]⬛ 2`.

@@ -1,12 +1,13 @@
 ---
 id: 33
 title: list silently accepts invalid --status, --priority, --sort and --format
-status: open
+status: closed
 priority: low
 labels:
     - bug
 created: "2026-11-20"
-updated: "2026-11-20"
+updated: "2026-11-21"
+closed: "2026-11-21"
 ---
 
 `issues list` does not validate its flag values:

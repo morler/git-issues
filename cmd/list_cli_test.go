@@ -408,3 +408,60 @@ func TestListCommandNoRepo(t *testing.T) {
 	}
 	wantContains(t, "error", err.Error(), "no .issues/ directory found")
 }
+
+func TestListCommandRejectsInvalidFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want string
+	}{
+		{"status", []string{"--status", "foo"}, `invalid status "foo"`},
+		{"priority", []string{"--priority", "foo"}, `invalid priority "foo"`},
+		{"sort", []string{"--sort", "foo"}, `invalid sort "foo"`},
+		{"format", []string{"--format", "foo"}, `invalid format "foo"`},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			repo := newCLIRepo(t)
+			repo.seed(t, &issue.Issue{ID: 1, Title: "Kept out of the way"})
+
+			_, _, err := repo.run(t, append([]string{"list"}, tt.args...)...)
+			if err == nil {
+				t.Fatalf("issues list %v: expected an error", tt.args)
+			}
+			wantContains(t, "error", err.Error(), tt.want)
+		})
+	}
+}
+
+func TestListCommandAcceptsAllStatus(t *testing.T) {
+	repo := newCLIRepo(t)
+	repo.seed(t, &issue.Issue{ID: 1, Title: "Open one", Status: "open"})
+	repo.seed(t, &issue.Issue{ID: 2, Title: "Closed one", Status: "closed", Closed: "2026-01-01"})
+
+	stdout, _ := listRun(t, repo, "--status", "all")
+
+	wantContains(t, "table", stdout, "Open one")
+	wantContains(t, "table", stdout, "Closed one")
+}
+
+func TestListCommandTruncatesLongLabels(t *testing.T) {
+	repo := newCLIRepo(t)
+	repo.seed(t, &issue.Issue{
+		ID: 1, Title: "Many labels", Status: "open", Priority: "medium",
+		Labels: []string{"bug", "auth", "feature", "security"},
+	})
+	repo.seed(t, &issue.Issue{ID: 2, Title: "Blocker", Status: "open", Priority: "medium"})
+	if _, _, err := repo.run(t, "relate", "2", "blocks", "1"); err != nil {
+		t.Fatalf("relate: %v", err)
+	}
+
+	stdout, _ := listRun(t, repo, "--status", "all")
+
+	row := listRow(t, stdout, "0001")
+	// The label column is capped, so the marker starts after a gap instead of
+	// being glued to the truncated label.
+	wantContains(t, "row 0001", row, "…  ⬜ 2")
+	wantNotContains(t, "row 0001", row, "security]⬜")
+}

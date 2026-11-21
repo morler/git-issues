@@ -36,6 +36,10 @@ var listCmd = &cobra.Command{
 		sortBy, _ := cmd.Flags().GetString("sort")
 		format, _ := cmd.Flags().GetString("format")
 
+		if err := validateListFlags(opts, sortBy, format); err != nil {
+			return err
+		}
+
 		issues, err := issue.LoadAll(issuesDir)
 		if err != nil {
 			return err
@@ -82,6 +86,30 @@ type filterOptions struct {
 	labels      []string
 	blocksID    int
 	dependsOnID int
+}
+
+var validSorts = []string{"priority", "id", "updated", "created"}
+var validFormats = []string{"table", "json", "ids"}
+
+// validStatusFilters is ValidStatuses plus the "all" escape hatch.
+var validStatusFilters = append(append([]string{}, issue.ValidStatuses...), "all")
+
+// validateListFlags rejects unknown flag values before any issue is loaded, so
+// a typo fails loudly instead of looking like "no issues match".
+func validateListFlags(opts filterOptions, sortBy, format string) error {
+	if !contains(validStatusFilters, opts.status) {
+		return fmt.Errorf("invalid status %q, must be one of: %s", opts.status, strings.Join(validStatusFilters, ", "))
+	}
+	if opts.priority != "" && !contains(issue.ValidPriorities, opts.priority) {
+		return fmt.Errorf("invalid priority %q, must be one of: %s", opts.priority, strings.Join(issue.ValidPriorities, ", "))
+	}
+	if !contains(validSorts, sortBy) {
+		return fmt.Errorf("invalid sort %q, must be one of: %s", sortBy, strings.Join(validSorts, ", "))
+	}
+	if !contains(validFormats, format) {
+		return fmt.Errorf("invalid format %q, must be one of: %s", format, strings.Join(validFormats, ", "))
+	}
+	return nil
 }
 
 // filterOptionsFromFlags reads the list filters from the command flags.
@@ -178,6 +206,16 @@ func emptyListMessage(opts filterOptions) string {
 	return fmt.Sprintf("No %s issues found.", opts.status)
 }
 
+// Table column widths, in display cells. titleWidth and labelWidth leave room
+// for the padding that separates the column from the next one.
+const (
+	idWidth     = 6
+	priWidth    = 10
+	statusWidth = 13
+	titleWidth  = 44
+	labelWidth  = 20
+)
+
 func printTable(issues []*issue.Issue, issueMap map[int]*issue.Issue, opts filterOptions) {
 	if len(issues) == 0 {
 		fmt.Println(emptyListMessage(opts))
@@ -187,18 +225,23 @@ func printTable(issues []*issue.Issue, issueMap map[int]*issue.Issue, opts filte
 	hasSymbols := false
 
 	_, _ = fmt.Fprintf(os.Stdout, "%s%s%s%s%s%s\n",
-		padRight("ID", 6), padRight("PRI", 10), padRight("STATUS", 13), padRight("TITLE", 46), padRight("LABELS", 14), "")
+		padRight("ID", idWidth),
+		padRight("PRI", priWidth),
+		padRight("STATUS", statusWidth),
+		padRight("TITLE", titleWidth+2),
+		padRight("LABELS", labelWidth+2),
+		"")
 
 	for _, iss := range issues {
 		relStr, hasMarker := relationMarker(iss, issueMap)
 		hasSymbols = hasSymbols || hasMarker
 
 		_, _ = fmt.Fprintf(os.Stdout, "%s%s%s%s%s%s\n",
-			padRight(fmt.Sprintf("%04d", iss.ID), 6),
-			padRight(iss.Priority, 10),
-			padRight(iss.Status, 13),
-			padRight(truncateDisplay(iss.Title, 44), 46),
-			padRight(formatLabels(iss.Labels), 14),
+			padRight(fmt.Sprintf("%04d", iss.ID), idWidth),
+			padRight(iss.Priority, priWidth),
+			padRight(iss.Status, statusWidth),
+			padRight(truncateDisplay(iss.Title, titleWidth), titleWidth+2),
+			padRight(truncateDisplay(formatLabels(iss.Labels), labelWidth), labelWidth+2),
 			relStr)
 	}
 
