@@ -293,6 +293,7 @@ make build    # build binary
 make test     # run tests
 make fmt-check # fail on gofmt drift (tracked .go files)
 make lint     # fmt-check + go vet + golangci-lint (v2)
+make qlty     # qlty check --all; fails on high/critical only
 make install  # install to /usr/local/bin
 ```
 

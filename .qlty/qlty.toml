@@ -61,32 +61,38 @@ name = "default"
 default = true
 
 
+# gofmt and golangci-lint are already the CI gates (make lint); osv-scanner
+# covers both module trees. Everything else here is what the Go/Go+Astro
+# toolchain does not check on its own.
 [[plugin]]
 name = "actionlint"
 
 [[plugin]]
-name = "gofmt"
-
-[[plugin]]
 name = "golangci-lint"
-mode = "comment"
 
 [[plugin]]
 name = "osv-scanner"
 
 [[plugin]]
 name = "radarlint-go"
-mode = "monitor"
-
-[[plugin]]
-name = "ripgrep"
-mode = "comment"
 
 [[plugin]]
 name = "shellcheck"
 
 [[plugin]]
-name = "trufflehog"
-
-[[plugin]]
 name = "zizmor"
+
+# Duplicated literals: the CLI tests are deliberately table-driven and literal
+# (flag names, expected messages), so triage them down instead of hoisting
+# every string into a constant. Production files still report at full level.
+[[triage]]
+match.rules = ["radarlint-go:go:S1192"]
+match.file_patterns = ["**/*_test.go"]
+set.level = "low"
+
+# Test functions are long by nature: one table, many assertions. Complexity is
+# a production-code signal, so demote it for tests only.
+[[triage]]
+match.rules = ["radarlint-go:go:S3776"]
+match.file_patterns = ["**/*_test.go"]
+set.level = "low"

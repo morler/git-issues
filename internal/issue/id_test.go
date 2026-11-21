@@ -37,7 +37,7 @@ func itoa(n int) string {
 	return string(digits)
 }
 
-func TestNextID_EmptyDirectory(t *testing.T) {
+func TestNextIDEmptyDirectory(t *testing.T) {
 	dir := t.TempDir()
 
 	got, err := NextID(dir)
@@ -49,7 +49,7 @@ func TestNextID_EmptyDirectory(t *testing.T) {
 	}
 }
 
-func TestNextID_GapsInIDs(t *testing.T) {
+func TestNextIDGapsInIDs(t *testing.T) {
 	dir := t.TempDir()
 
 	writeTestIssue(t, dir, 1, "0001-first.md")
@@ -65,7 +65,7 @@ func TestNextID_GapsInIDs(t *testing.T) {
 	}
 }
 
-func TestNextID_SingleIssue(t *testing.T) {
+func TestNextIDSingleIssue(t *testing.T) {
 	dir := t.TempDir()
 
 	writeTestIssue(t, dir, 1, "0001-only-issue.md")
@@ -79,7 +79,7 @@ func TestNextID_SingleIssue(t *testing.T) {
 	}
 }
 
-func TestNextID_IgnoresNonMdFiles(t *testing.T) {
+func TestNextIDIgnoresNonMdFiles(t *testing.T) {
 	dir := t.TempDir()
 
 	writeTestIssue(t, dir, 10, "0010-real-issue.md")
@@ -99,7 +99,7 @@ func TestNextID_IgnoresNonMdFiles(t *testing.T) {
 	}
 }
 
-func TestNextID_CorruptedHighestFileStillReservesID(t *testing.T) {
+func TestNextIDCorruptedHighestFileStillReservesID(t *testing.T) {
 	dir := t.TempDir()
 
 	writeTestIssue(t, dir, 9, "0009-good.md")
@@ -139,7 +139,7 @@ func TestIDFromFilename(t *testing.T) {
 	}
 }
 
-func TestNextID_IgnoresDotFiles(t *testing.T) {
+func TestNextIDIgnoresDotFiles(t *testing.T) {
 	dir := t.TempDir()
 
 	writeTestIssue(t, dir, 5, "0005-real.md")
