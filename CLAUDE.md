@@ -8,7 +8,7 @@ Build a CLI tool called `git-issues` (binary: `issues`) that provides a git-nati
 
 ## Tech Stack
 
-- **Language:** Go 1.25+
+- **Language:** Go 1.26.11+
 - **Dependencies (minimal):**
   - `gopkg.in/yaml.v3` – Frontmatter parsing
   - `github.com/spf13/cobra` – CLI framework

@@ -16,7 +16,7 @@ cd git-issues
 make install   # builds and copies to /usr/local/bin/issues
 ```
 
-Requires Go 1.25+. The `go install` command places the `issues` binary in `$GOPATH/bin` (or `$HOME/go/bin`). Make sure this directory is in your `$PATH`.
+Requires Go 1.26.11+ (older toolchains ship reachable stdlib vulnerabilities). The `go install` command places the `issues` binary in `$GOPATH/bin` (or `$HOME/go/bin`). Make sure this directory is in your `$PATH`.
 
 ## Setup (for AI agents)
 
