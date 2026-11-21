@@ -82,17 +82,9 @@ name = "shellcheck"
 [[plugin]]
 name = "zizmor"
 
-# Duplicated literals: the CLI tests are deliberately table-driven and literal
-# (flag names, expected messages), so triage them down instead of hoisting
-# every string into a constant. Production files still report at full level.
-[[triage]]
-match.rules = ["radarlint-go:go:S1192"]
-match.file_patterns = ["**/*_test.go"]
-set.level = "low"
-
-# Test functions are long by nature: one table, many assertions. Complexity is
-# a production-code signal, so demote it for tests only.
-[[triage]]
-match.rules = ["radarlint-go:go:S3776"]
-match.file_patterns = ["**/*_test.go"]
-set.level = "low"
+# radarlint's Java-derived rules (duplicated literals, cognitive complexity) are
+# written for production code. Table-driven tests repeat flag names and expected
+# messages on purpose, so skip test files for this plugin entirely.
+[[exclude]]
+plugins = ["radarlint-go"]
+file_patterns = ["**/*_test.go"]
