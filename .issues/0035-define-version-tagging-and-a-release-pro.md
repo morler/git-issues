@@ -1,13 +1,13 @@
 ---
 id: 35
 title: Define version tagging and a release process
-status: open
+status: in-progress
 priority: low
 labels:
     - docs
     - tooling
 created: "2026-11-20"
-updated: "2026-11-20"
+updated: "2026-11-21"
 ---
 
 The repository has no git tags, so `go install github.com/steviee/git-issues/cmd/issues@latest` (README, install section) resolves to a pseudo-version: no pinning, no rollback, no way to say "1.0".
