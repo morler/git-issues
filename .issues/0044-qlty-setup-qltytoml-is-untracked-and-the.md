@@ -1,7 +1,7 @@
 ---
 id: 44
-title: 'qlty setup: qlty.toml is untracked and the config is untailored'
-status: open
+title: qlty config is untailored and not wired into make/CI
+status: in-progress
 priority: low
 labels:
     - tooling
