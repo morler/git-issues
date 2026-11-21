@@ -17,3 +17,8 @@ updated: "2026-11-21"
 - the 128 radarlint test-file findings and the 179 osv findings dominate the output: a single run yields 336 issues, of which only ~11 are actionable in production code.
 
 Decide whether .qlty/qlty.toml should be committed (upstream recommends committing it), tailor exclude_patterns/[[triage]] so CI-visible findings stay meaningful, and add qlty to the Makefile quality gates or state explicitly that it is a local-only review tool.
+
+## Version control decided
+`.qlty/qlty.toml`, `.qlty/.gitignore` and `.qlty/configs/.shellcheckrc` are now committed (78ff512). Qlty's generated `.gitignore` whitelists exactly those three paths and ignores the per-machine cache symlinks (`logs`, `out`, `results`, `plugin_cachedir`) plus `sources/`, so a clean clone runs `qlty check` without `qlty init` - verified in a fresh clone of the repo.
+
+Still open here: the plugin set is untailored (see the list above) and qlty is not part of `make lint` or CI.
